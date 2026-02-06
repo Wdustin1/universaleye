@@ -28,14 +28,6 @@ export function StatsBar() {
       accent: "destructive",
     },
     {
-      label: "Yield Rate",
-      value: "99.82",
-      unit: "%",
-      icon: <TrendingUp className="w-3.5 h-3.5" />,
-      trend: "up",
-      accent: "success",
-    },
-    {
       label: "Run Time",
       value: "02:34:18",
       icon: <Timer className="w-3.5 h-3.5" />,
