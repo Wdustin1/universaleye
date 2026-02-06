@@ -1,11 +1,8 @@
 "use client"
 
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { DropdownMenuContent } from "@/components/ui/dropdown-menu"
-import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { DropdownMenu } from "@/components/ui/dropdown-menu"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Eye, Settings, Circle, ChevronDown, Bell } from "lucide-react"
+import { Settings, Circle } from "lucide-react"
 import { useState } from "react"
 
 export function DashboardHeader() {
@@ -15,16 +12,20 @@ export function DashboardHeader() {
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
-            <Eye className="w-4 h-4 text-primary-foreground" />
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Image
+            src="/logo.png"
+            alt="Universal Eye"
+            width={36}
+            height={36}
+            className="rounded"
+          />
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
               Universal Eye
             </h1>
             <p className="text-[10px] text-muted-foreground tracking-widest uppercase">
-              Inspection System
+              Web Monitoring System
             </p>
           </div>
         </div>
