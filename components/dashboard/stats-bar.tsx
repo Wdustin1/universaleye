@@ -1,16 +1,8 @@
 "use client"
 
 import React from "react"
-
 import { useEffect, useState } from "react"
-import {
-  Gauge,
-  Hash,
-  AlertTriangle,
-  TrendingUp,
-  Timer,
-  Layers,
-} from "lucide-react"
+import { Hash, AlertTriangle, TrendingUp, Timer, Layers, Gauge } from "lucide-react"
 
 interface StatItem {
   label: string
@@ -23,13 +15,6 @@ interface StatItem {
 
 export function StatsBar() {
   const [stats, setStats] = useState<StatItem[]>([
-    {
-      label: "Line Speed",
-      value: "194",
-      unit: "m/min",
-      icon: <Gauge className="w-3.5 h-3.5" />,
-      accent: "default",
-    },
     {
       label: "Labels Inspected",
       value: "12,847",
@@ -75,11 +60,7 @@ export function StatsBar() {
             const next = current + Math.floor(Math.random() * 3) + 1
             return { ...stat, value: next.toLocaleString() }
           }
-          if (stat.label === "Line Speed") {
-            const base = 194
-            const variance = Math.floor(Math.random() * 5) - 2
-            return { ...stat, value: String(base + variance) }
-          }
+
           return stat
         }),
       )

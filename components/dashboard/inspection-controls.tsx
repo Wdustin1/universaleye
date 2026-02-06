@@ -1,24 +1,21 @@
 "use client"
 
-import React from "react"
-
 import { useState } from "react"
 import {
   Play,
   Pause,
   Square,
-  RotateCcw,
   SlidersHorizontal,
   Camera,
-  Lightbulb,
-  Focus,
+  RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+type InspectionState = "running" | "paused" | "stopped"
+
 export function InspectionControls() {
-  const [isInspecting, setIsInspecting] = useState(true)
+  const [state, setState] = useState<InspectionState>("running")
   const [sensitivity, setSensitivity] = useState(75)
-  const [autoReject, setAutoReject] = useState(true)
 
   return (
     <div className="flex flex-col h-full">
@@ -28,44 +25,78 @@ export function InspectionControls() {
         </h2>
       </div>
 
-      <div className="flex-1 p-3 flex flex-col gap-4">
+      <div className="flex-1 p-3 flex flex-col gap-5">
         {/* Transport Controls */}
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
             Inspection
           </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={isInspecting ? "default" : "ghost"}
-              size="sm"
-              className={`flex-1 h-8 gap-1.5 text-xs ${
-                isInspecting
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
+          <div className="flex flex-col gap-2">
+            {/* Start / Resume */}
+            <button
+              type="button"
+              onClick={() => setState("running")}
+              className={`relative flex items-center justify-center gap-2.5 w-full h-11 rounded-lg text-sm font-medium transition-all ${
+                state === "running"
+                  ? "bg-primary text-primary-foreground shadow-[0_0_12px_hsl(168_75%_42%/0.3)]"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent"
               }`}
-              onClick={() => setIsInspecting(true)}
             >
-              <Play className="w-3 h-3" />
-              Start
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 h-8 gap-1.5 text-xs text-muted-foreground"
-              onClick={() => setIsInspecting(false)}
-            >
-              <Pause className="w-3 h-3" />
-              Pause
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 h-8 gap-1.5 text-xs text-muted-foreground"
-              onClick={() => setIsInspecting(false)}
-            >
-              <Square className="w-3 h-3" />
-              Stop
-            </Button>
+              {state === "running" && (
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
+              )}
+              <Play className="w-4 h-4" />
+              {state === "paused" ? "Resume" : "Start"}
+            </button>
+
+            {/* Pause / Stop row */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setState("paused")}
+                className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
+                  state === "paused"
+                    ? "bg-warning/15 text-warning border border-warning/30"
+                    : "bg-secondary text-secondary-foreground hover:bg-accent"
+                }`}
+              >
+                <Pause className="w-3.5 h-3.5" />
+                Pause
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setState("stopped")}
+                className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
+                  state === "stopped"
+                    ? "bg-destructive/15 text-destructive border border-destructive/30"
+                    : "bg-secondary text-secondary-foreground hover:bg-accent"
+                }`}
+              >
+                <Square className="w-3.5 h-3.5" />
+                Stop
+              </button>
+            </div>
+          </div>
+
+          {/* State indicator */}
+          <div className="flex items-center gap-2 mt-3 px-1">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                state === "running"
+                  ? "bg-primary animate-pulse"
+                  : state === "paused"
+                    ? "bg-warning"
+                    : "bg-muted-foreground"
+              }`}
+            />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {state === "running"
+                ? "Inspecting"
+                : state === "paused"
+                  ? "Paused"
+                  : "Stopped"}
+            </span>
           </div>
         </div>
 
@@ -99,43 +130,6 @@ export function InspectionControls() {
           </div>
         </div>
 
-        {/* Quick Settings */}
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-            Quick Settings
-          </p>
-          <div className="flex flex-col gap-1.5">
-            <ToggleSetting
-              icon={<RotateCcw className="w-3 h-3" />}
-              label="Auto-Reject"
-              description="Automatically reject flagged labels"
-              enabled={autoReject}
-              onChange={setAutoReject}
-            />
-            <ToggleSetting
-              icon={<Lightbulb className="w-3 h-3" />}
-              label="LED Strobe"
-              description="High-frequency LED illumination"
-              enabled={true}
-              onChange={() => {}}
-            />
-            <ToggleSetting
-              icon={<Focus className="w-3 h-3" />}
-              label="Auto-Focus"
-              description="Dynamic focus adjustment"
-              enabled={true}
-              onChange={() => {}}
-            />
-            <ToggleSetting
-              icon={<Camera className="w-3 h-3" />}
-              label="Multi-Camera"
-              description="Enable all camera inputs"
-              enabled={false}
-              onChange={() => {}}
-            />
-          </div>
-        </div>
-
         {/* Reference Actions */}
         <div className="mt-auto">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
@@ -154,44 +148,5 @@ export function InspectionControls() {
         </div>
       </div>
     </div>
-  )
-}
-
-function ToggleSetting({
-  icon,
-  label,
-  description,
-  enabled,
-  onChange,
-}: {
-  icon: React.ReactNode
-  label: string
-  description: string
-  enabled: boolean
-  onChange: (val: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!enabled)}
-      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors text-left ${
-        enabled ? "bg-secondary" : "bg-transparent hover:bg-secondary/50"
-      }`}
-    >
-      <div className={`${enabled ? "text-primary" : "text-muted-foreground"}`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-medium text-foreground">{label}</p>
-        <p className="text-[9px] text-muted-foreground leading-tight">{description}</p>
-      </div>
-      <div
-        className={`w-7 h-4 rounded-full transition-colors flex items-center ${
-          enabled ? "bg-primary justify-end" : "bg-muted justify-start"
-        }`}
-      >
-        <div className="w-3 h-3 rounded-full bg-foreground mx-0.5" />
-      </div>
-    </button>
   )
 }
