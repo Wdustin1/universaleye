@@ -3,7 +3,6 @@ import { StatsBar } from "@/components/dashboard/stats-bar"
 import { LiveFeedPanel } from "@/components/dashboard/live-feed"
 import { ReferenceComparison } from "@/components/dashboard/reference-comparison"
 import { DefectLog } from "@/components/dashboard/defect-log"
-import { DefectTimeline } from "@/components/dashboard/defect-timeline"
 import { InspectionControls } from "@/components/dashboard/inspection-controls"
 import { DefectBreakdown } from "@/components/dashboard/defect-breakdown"
 
@@ -37,14 +36,9 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Bottom bar: Timeline and Breakdown */}
-          <div className="h-36 flex border-t border-border">
-            <div className="flex-[3] border-r border-border bg-card">
-              <DefectTimeline />
-            </div>
-            <div className="flex-[2] bg-card">
-              <DefectBreakdown />
-            </div>
+          {/* Bottom bar: Breakdown */}
+          <div className="h-36 border-t border-border bg-card">
+            <DefectBreakdown />
           </div>
         </main>
 
