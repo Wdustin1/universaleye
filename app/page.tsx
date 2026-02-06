@@ -16,28 +16,28 @@ export default function Page() {
       <StatsBar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         {/* Left Column: Controls */}
         <aside className="w-56 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
           <InspectionControls />
         </aside>
 
         {/* Center: Main viewport */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {/* Live feed and reference */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex min-h-0">
             {/* Live Feed - takes majority of space */}
-            <div className="flex-[3] border-r border-border bg-card">
+            <div className="flex-[3] min-w-0 border-r border-border bg-card overflow-hidden">
               <LiveFeedPanel />
             </div>
             {/* Reference Comparison */}
-            <div className="flex-[2] bg-card">
+            <div className="flex-[2] min-w-0 bg-card overflow-hidden">
               <ReferenceComparison />
             </div>
           </div>
 
           {/* Bottom bar: Breakdown */}
-          <div className="h-36 border-t border-border bg-card">
+          <div className="h-36 flex-shrink-0 border-t border-border bg-card overflow-hidden">
             <DefectBreakdown />
           </div>
         </main>
