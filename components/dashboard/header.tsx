@@ -1,20 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import {
-  Eye,
-  Settings,
-  Bell,
-  ChevronDown,
-  Circle,
-} from "lucide-react"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { DropdownMenuContent } from "@/components/ui/dropdown-menu"
+import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Eye, Settings, Circle, ChevronDown, Bell } from "lucide-react"
+import { useState } from "react"
 
 export function DashboardHeader() {
   const [currentJob] = useState("JOB-2026-0247")
@@ -56,26 +48,6 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
-              Camera 1
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Camera 1</DropdownMenuItem>
-            <DropdownMenuItem>Camera 2</DropdownMenuItem>
-            <DropdownMenuItem>Camera 3</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button variant="ghost" size="icon" className="h-8 w-8 relative">
-          <Bell className="w-4 h-4 text-muted-foreground" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
-          <span className="sr-only">Notifications</span>
-        </Button>
-
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Settings className="w-4 h-4 text-muted-foreground" />
           <span className="sr-only">Settings</span>
