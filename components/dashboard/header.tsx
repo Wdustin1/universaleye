@@ -14,11 +14,11 @@ export function DashboardHeader() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2.5">
           <Image
-            src="/logo.png"
+            src="/logo.jpg"
             alt="Universal Eye"
-            width={36}
-            height={36}
-            className="rounded"
+            width={32}
+            height={32}
+            className="rounded-md"
           />
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
