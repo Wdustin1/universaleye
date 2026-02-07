@@ -18,7 +18,7 @@ export default function Page() {
       {/* Main Content Area */}
       <div className="flex-1 flex min-h-0">
         {/* Left Column: Controls */}
-        <aside className="w-56 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
+        <aside className="w-44 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
           <InspectionControls />
         </aside>
 
@@ -26,8 +26,8 @@ export default function Page() {
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {/* Live feed and reference */}
           <div className="flex-1 flex min-h-0">
-            {/* Live Feed - takes majority of space */}
-            <div className="flex-[3] min-w-0 border-r border-border bg-card overflow-hidden">
+            {/* Live Feed - dominant panel */}
+            <div className="flex-[5] min-w-0 border-r border-border bg-card overflow-hidden">
               <LiveFeedPanel />
             </div>
             {/* Reference Comparison */}
@@ -37,13 +37,13 @@ export default function Page() {
           </div>
 
           {/* Bottom bar: Breakdown */}
-          <div className="h-36 flex-shrink-0 border-t border-border bg-card overflow-hidden">
+          <div className="h-28 flex-shrink-0 border-t border-border bg-card overflow-hidden">
             <DefectBreakdown />
           </div>
         </main>
 
         {/* Right Column: Defect Log */}
-        <aside className="w-72 flex-shrink-0 border-l border-border bg-card overflow-hidden">
+        <aside className="w-60 flex-shrink-0 border-l border-border bg-card overflow-hidden">
           <DefectLog />
         </aside>
       </div>
