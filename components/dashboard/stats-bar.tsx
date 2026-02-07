@@ -33,13 +33,7 @@ export function StatsBar() {
       icon: <Timer className="w-3.5 h-3.5" />,
       accent: "default",
     },
-    {
-      label: "Waste",
-      value: "4",
-      unit: "labels",
-      icon: <Layers className="w-3.5 h-3.5" />,
-      accent: "warning",
-    },
+
   ])
 
   // Simulate live data updates
