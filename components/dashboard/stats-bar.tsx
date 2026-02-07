@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useEffect, useState } from "react"
-import { Hash, AlertTriangle, TrendingUp, Timer, Layers, Gauge } from "lucide-react"
+import { Hash, AlertTriangle, Timer } from "lucide-react"
 
 interface StatItem {
   label: string
