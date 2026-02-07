@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Filter, ChevronDown } from "lucide-react"
+import { Filter, ChevronDown, X, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -46,6 +46,7 @@ const MOCK_DEFECTS: Defect[] = [
 ]
 
 export function DefectLog() {
+  const [open, setOpen] = useState(false)
   const [defects] = useState<Defect[]>(MOCK_DEFECTS)
   const [selectedDefect, setSelectedDefect] = useState<number>(23)
   const [filterType, setFilterType] = useState<string>("All")
@@ -54,6 +55,8 @@ export function DefectLog() {
   const filteredDefects = filterType === "All"
     ? defects
     : defects.filter((d) => d.type === filterType)
+
+  const criticalCount = defects.filter((d) => d.severity === "critical").length
 
   useEffect(() => {
     for (const defect of filteredDefects) {
@@ -65,97 +68,139 @@ export function DefectLog() {
   }, [filteredDefects])
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <h2 className="text-xs font-medium text-foreground uppercase tracking-wider">
-          Defect History
-        </h2>
-        <div className="flex items-center gap-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 text-muted-foreground px-2">
-                <Filter className="w-3 h-3" />
-                {filterType}
-                <ChevronDown className="w-2.5 h-2.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterType("All")}>
-                All Types
-              </DropdownMenuItem>
-              {DEFECT_TYPES.map((type) => (
-                <DropdownMenuItem key={type} onClick={() => setFilterType(type)}>
-                  {type}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <span className="text-[10px] font-mono text-muted-foreground">
-            {filteredDefects.length} total
-          </span>
+    <>
+      {/* Toggle button - always visible on right edge */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1.5 bg-card border border-border border-r-0 rounded-l-lg px-2 py-3 hover:bg-accent transition-colors shadow-lg"
+        aria-label="Open defect history"
+      >
+        <History className="w-4 h-4 text-muted-foreground" />
+        <div className="flex flex-col items-center">
+          <span className="text-[10px] font-medium text-foreground leading-none">{defects.length}</span>
+          {criticalCount > 0 && (
+            <span className="text-[9px] text-destructive font-medium leading-tight mt-0.5">{criticalCount}</span>
+          )}
+        </div>
+      </button>
+
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-background/40 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Slide-out panel */}
+      <div
+        className={`fixed top-0 right-0 z-50 h-full w-80 bg-card border-l border-border shadow-2xl transition-transform duration-200 ease-out ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+            <h2 className="text-xs font-medium text-foreground uppercase tracking-wider">
+              Defect History
+            </h2>
+            <div className="flex items-center gap-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 text-muted-foreground px-2">
+                    <Filter className="w-3 h-3" />
+                    {filterType}
+                    <ChevronDown className="w-2.5 h-2.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setFilterType("All")}>
+                    All Types
+                  </DropdownMenuItem>
+                  {DEFECT_TYPES.map((type) => (
+                    <DropdownMenuItem key={type} onClick={() => setFilterType(type)}>
+                      {type}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {filteredDefects.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="ml-1 p-1 rounded hover:bg-secondary transition-colors"
+                aria-label="Close defect history"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {filteredDefects.map((defect) => (
+              <button
+                key={defect.id}
+                type="button"
+                onClick={() => setSelectedDefect(defect.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 border-b border-border transition-colors text-left ${
+                  selectedDefect === defect.id
+                    ? "bg-accent"
+                    : "hover:bg-secondary"
+                }`}
+              >
+                <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background">
+                  <canvas
+                    ref={(el) => {
+                      if (el) thumbnailCanvasRefs.current.set(defect.id, el)
+                    }}
+                    width={40}
+                    height={40}
+                    className="w-full h-full"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">#{defect.id}</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                        defect.severity === "critical"
+                          ? "bg-destructive/10 text-destructive"
+                          : defect.severity === "major"
+                            ? "bg-warning/10 text-warning"
+                            : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {defect.severity}
+                    </span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-medium ml-auto ${
+                        defect.aiVerdict === "reject"
+                          ? "bg-destructive/10 text-destructive"
+                          : defect.aiVerdict === "accept"
+                            ? "bg-success/10 text-success"
+                            : "bg-warning/10 text-warning"
+                      }`}
+                    >
+                      {defect.aiVerdict}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-muted-foreground">{defect.type}</span>
+                    <span className="text-[10px] text-muted-foreground">L{defect.lane}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground ml-auto">
+                      {defect.timestamp}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {filteredDefects.map((defect) => (
-          <button
-            key={defect.id}
-            type="button"
-            onClick={() => setSelectedDefect(defect.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 border-b border-border transition-colors text-left ${
-              selectedDefect === defect.id
-                ? "bg-accent"
-                : "hover:bg-secondary"
-            }`}
-          >
-            <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background">
-              <canvas
-                ref={(el) => {
-                  if (el) thumbnailCanvasRefs.current.set(defect.id, el)
-                }}
-                width={40}
-                height={40}
-                className="w-full h-full"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-foreground">#{defect.id}</span>
-                <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                    defect.severity === "critical"
-                      ? "bg-destructive/10 text-destructive"
-                      : defect.severity === "major"
-                        ? "bg-warning/10 text-warning"
-                        : "bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  {defect.severity}
-                </span>
-                <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium ml-auto ${
-                    defect.aiVerdict === "reject"
-                      ? "bg-destructive/10 text-destructive"
-                      : defect.aiVerdict === "accept"
-                        ? "bg-success/10 text-success"
-                        : "bg-warning/10 text-warning"
-                  }`}
-                >
-                  {defect.aiVerdict}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-muted-foreground">{defect.type}</span>
-                <span className="text-[10px] text-muted-foreground">L{defect.lane}</span>
-                <span className="text-[10px] font-mono text-muted-foreground ml-auto">
-                  {defect.timestamp}
-                </span>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
+    </>
   )
 }
 

@@ -42,10 +42,8 @@ export default function Page() {
           </div>
         </main>
 
-        {/* Right Column: Defect Log */}
-        <aside className="w-60 flex-shrink-0 border-l border-border bg-card overflow-hidden">
-          <DefectLog />
-        </aside>
+        {/* Defect Log - slide-out panel */}
+        <DefectLog />
       </div>
     </div>
   )
