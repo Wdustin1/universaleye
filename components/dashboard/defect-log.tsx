@@ -45,8 +45,7 @@ const MOCK_DEFECTS: Defect[] = [
   { id: 14, timestamp: "14:24:02", type: "Web Crease", severity: "major", labelNumber: 12695, lane: 1, aiVerdict: "reject" },
 ]
 
-export function DefectLog() {
-  const [open, setOpen] = useState(false)
+export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [defects] = useState<Defect[]>(MOCK_DEFECTS)
   const [selectedDefect, setSelectedDefect] = useState<number>(23)
   const [filterType, setFilterType] = useState<string>("All")
@@ -69,27 +68,11 @@ export function DefectLog() {
 
   return (
     <>
-      {/* Toggle button - always visible on right edge */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1.5 bg-card border border-border border-r-0 rounded-l-lg px-2 py-3 hover:bg-accent transition-colors shadow-lg"
-        aria-label="Open defect history"
-      >
-        <History className="w-4 h-4 text-muted-foreground" />
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] font-medium text-foreground leading-none">{defects.length}</span>
-          {criticalCount > 0 && (
-            <span className="text-[9px] text-destructive font-medium leading-tight mt-0.5">{criticalCount}</span>
-          )}
-        </div>
-      </button>
-
       {/* Backdrop */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-background/40 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
+          onClick={() => onOpenChange(false)}
           aria-hidden="true"
         />
       )}
@@ -130,7 +113,7 @@ export function DefectLog() {
               </span>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
                 className="ml-1 p-1 rounded hover:bg-secondary transition-colors"
                 aria-label="Close defect history"
               >

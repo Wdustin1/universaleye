@@ -2,10 +2,10 @@
 
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Settings, Circle } from "lucide-react"
+import { Settings, Circle, History } from "lucide-react"
 import { useState } from "react"
 
-export function DashboardHeader() {
+export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; onDefectHistoryClick?: () => void }) {
   const [currentJob] = useState("JOB-2026-0247")
   const [productName] = useState("Premium Wine Label - Merlot Reserve")
 
@@ -48,7 +48,16 @@ export function DashboardHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-muted-foreground px-2.5" onClick={onDefectHistoryClick}>
+          <History className="w-3.5 h-3.5" />
+          Defect History
+          {defectCount !== undefined && defectCount > 0 && (
+            <span className="ml-0.5 text-[10px] font-mono bg-destructive/15 text-destructive px-1.5 py-0.5 rounded">
+              {defectCount}
+            </span>
+          )}
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Settings className="w-4 h-4 text-muted-foreground" />
           <span className="sr-only">Settings</span>

@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { StatsBar } from "@/components/dashboard/stats-bar"
 import { LiveFeedPanel } from "@/components/dashboard/live-feed"
@@ -7,10 +10,15 @@ import { InspectionControls } from "@/components/dashboard/inspection-controls"
 import { DefectBreakdown } from "@/components/dashboard/defect-breakdown"
 
 export default function Page() {
+  const [defectLogOpen, setDefectLogOpen] = useState(false)
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <DashboardHeader />
+      <DashboardHeader
+        defectCount={10}
+        onDefectHistoryClick={() => setDefectLogOpen(true)}
+      />
 
       {/* Stats Bar */}
       <StatsBar />
@@ -43,7 +51,7 @@ export default function Page() {
         </main>
 
         {/* Defect Log - slide-out panel */}
-        <DefectLog />
+        <DefectLog open={defectLogOpen} onOpenChange={setDefectLogOpen} />
       </div>
     </div>
   )
