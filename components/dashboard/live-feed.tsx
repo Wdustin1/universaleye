@@ -14,12 +14,18 @@ export function LiveFeedPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [defectBoxes, setDefectBoxes] = useState<
     { x: number; y: number; w: number; h: number; type: string }[]
   >([])
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Draw a simulated label inspection feed
   useEffect(() => {
+    if (!mounted) return
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -218,7 +224,7 @@ export function LiveFeedPanel() {
     const scanInterval = setInterval(animateScan, 16)
 
     return () => clearInterval(scanInterval)
-  }, [showGrid, zoom])
+  }, [showGrid, zoom, mounted])
 
   return (
     <div className="flex flex-col h-full">

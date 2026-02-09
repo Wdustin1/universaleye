@@ -14,6 +14,7 @@ interface StatItem {
 }
 
 export function StatsBar() {
+  const [mounted, setMounted] = useState(false)
   const [stats, setStats] = useState<StatItem[]>([
     {
       label: "Labels Inspected",
@@ -36,8 +37,13 @@ export function StatsBar() {
 
   ])
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Simulate live data updates
   useEffect(() => {
+    if (!mounted) return
     const interval = setInterval(() => {
       setStats((prev) =>
         prev.map((stat) => {
@@ -52,7 +58,7 @@ export function StatsBar() {
       )
     }, 2000)
     return () => clearInterval(interval)
-  }, [])
+  }, [mounted])
 
   return (
     <div className="flex items-stretch border-b border-border bg-card">
