@@ -100,6 +100,8 @@ export function InspectionControls() {
           </div>
         </div>
 
+        <div className="h-px bg-border -mx-3" />
+
         {/* Sensitivity Slider */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -109,10 +111,14 @@ export function InspectionControls() {
             </p>
             <span className="text-[10px] font-mono text-foreground">{sensitivity}%</span>
           </div>
-          <div className="relative h-1.5 bg-secondary rounded-full">
+          <div className="relative h-1.5 bg-secondary rounded-full group">
             <div
               className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
               style={{ width: `${sensitivity}%` }}
+            />
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-primary-foreground shadow-sm transition-all"
+              style={{ left: `calc(${sensitivity}% - 6px)` }}
             />
             <input
               type="range"
@@ -131,7 +137,7 @@ export function InspectionControls() {
         </div>
 
         {/* Reference Actions */}
-        <div className="mt-auto">
+        <div className="mt-auto pt-4 border-t border-border -mx-3 px-3">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             Reference
           </p>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Filter, ChevronDown, X, History } from "lucide-react"
+import { Filter, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -54,8 +54,6 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
   const filteredDefects = filterType === "All"
     ? defects
     : defects.filter((d) => d.type === filterType)
-
-  const criticalCount = defects.filter((d) => d.severity === "critical").length
 
   useEffect(() => {
     for (const defect of filteredDefects) {
@@ -122,16 +120,16 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
             {filteredDefects.map((defect) => (
               <button
                 key={defect.id}
                 type="button"
                 onClick={() => setSelectedDefect(defect.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 border-b border-border transition-colors text-left ${
+                className={`w-full flex items-center gap-3 py-2.5 pr-3 border-b border-border transition-colors text-left ${
                   selectedDefect === defect.id
-                    ? "bg-accent"
-                    : "hover:bg-secondary"
+                    ? "bg-accent border-l-2 border-l-primary pl-2.5"
+                    : "hover:bg-secondary border-l-2 border-l-transparent pl-2.5"
                 }`}
               >
                 <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background">
@@ -181,6 +179,12 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
               </button>
             ))}
           </div>
+
+          {/* Summary footer */}
+          <div className="flex items-center justify-between px-3 py-2 border-t border-border text-[10px] text-muted-foreground">
+            <span>{defects.filter((d) => d.severity === "critical").length} critical</span>
+            <span>{defects.filter((d) => d.aiVerdict === "reject").length} rejected</span>
+          </div>
         </div>
       </div>
     </>
@@ -201,10 +205,11 @@ function drawThumbnail(canvas: HTMLCanvasElement, defect: Defect) {
   ctx.fillStyle = "#1a1c2e"
   ctx.fillRect(3, 3, w - 6, h - 6)
 
-  // Content lines
+  // Content lines (deterministic widths based on defect id)
+  const lineOffsets = [3, 8, 5]
   for (let i = 0; i < 3; i++) {
     ctx.fillStyle = "#22243a"
-    ctx.fillRect(6, 8 + i * 6, w * 0.5 + Math.random() * 10, 3)
+    ctx.fillRect(6, 8 + i * 6, w * 0.5 + ((defect.id * 7 + i * 3) % 10) + lineOffsets[i], 3)
   }
 
   // Defect mark

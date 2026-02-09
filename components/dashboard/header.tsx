@@ -10,7 +10,7 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
   const [productName] = useState("Premium Wine Label - Merlot Reserve")
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shadow-[0_1px_3px_0_rgba(0,0,0,0.3)]">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2.5">
           <Image
@@ -35,16 +35,19 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
         <div className="flex items-center gap-3">
           <StatusIndicator status="inspecting" />
           <div>
-            <p className="text-xs text-muted-foreground">Active Job</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active Job</p>
             <p className="text-sm font-medium font-mono text-foreground">{currentJob}</p>
           </div>
         </div>
 
         <div className="h-6 w-px bg-border" />
 
-        <div>
-          <p className="text-xs text-muted-foreground">Product</p>
-          <p className="text-sm text-foreground">{productName}</p>
+        <div className="flex items-center gap-2">
+          <div className="w-0.5 h-7 rounded-full bg-primary/40" />
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Product</p>
+            <p className="text-sm text-foreground">{productName}</p>
+          </div>
         </div>
       </div>
 
@@ -74,10 +77,10 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
 
 function StatusIndicator({ status }: { status: "inspecting" | "idle" | "paused" | "error" }) {
   const config = {
-    inspecting: { label: "Inspecting", color: "bg-success", pulse: true },
-    idle: { label: "Idle", color: "bg-muted-foreground", pulse: false },
-    paused: { label: "Paused", color: "hsl(var(--warning))", pulse: false },
-    error: { label: "Error", color: "bg-destructive", pulse: true },
+    inspecting: { label: "Inspecting", pulse: true },
+    idle: { label: "Idle", pulse: false },
+    paused: { label: "Paused", pulse: false },
+    error: { label: "Error", pulse: true },
   }
 
   const { label, pulse } = config[status]

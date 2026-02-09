@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Maximize2,
   ZoomIn,
@@ -10,25 +10,25 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+// Deterministic line widths for consistent rendering across re-draws
+const LABEL_LINE_WIDTHS = [
+  [0.82, 0.71, 0.88, 0.65],
+  [0.75, 0.90, 0.68, 0.78],
+  [0.85, 0.62, 0.93, 0.72],
+  [0.70, 0.88, 0.76, 0.84],
+  [0.91, 0.67, 0.80, 0.73],
+  [0.78, 0.85, 0.69, 0.92],
+]
+
+const DEFECT_COUNT = 1
+
 export function LiveFeedPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const scanCanvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [defectBoxes, setDefectBoxes] = useState<
-    { x: number; y: number; w: number; h: number; type: string }[]
-  >([])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Draw a simulated label inspection feed
-  useEffect(() => {
-    if (!mounted) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-
+  const drawContent = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
@@ -48,6 +48,7 @@ export function LiveFeedPanel() {
 
     for (let row = 0; row < labelRows; row++) {
       for (let col = 0; col < labelCols; col++) {
+        const labelIdx = row * labelCols + col
         const x = gap + col * (labelW + gap)
         const y = gap + row * (labelH + gap)
 
@@ -71,11 +72,11 @@ export function LiveFeedPanel() {
         ctx.fillStyle = "#252840"
         ctx.fillRect(innerX, innerY, innerW, 16)
 
-        // Body content lines
+        // Body content lines (deterministic widths)
         for (let line = 0; line < 4; line++) {
           ctx.fillStyle = line % 2 === 0 ? "#1e2035" : "#22243a"
           const lineY = innerY + 22 + line * 10
-          const lineW = innerW * (0.6 + Math.random() * 0.35)
+          const lineW = innerW * LABEL_LINE_WIDTHS[labelIdx][line]
           ctx.fillRect(innerX, lineY, lineW, 6)
         }
 
@@ -135,96 +136,102 @@ export function LiveFeedPanel() {
     }
 
     // Simulate defect box on one label
-    const defects = [
-      {
-        x: gap + 2 * (labelW + gap) + labelW * 0.3,
-        y: gap + 1 * (labelH + gap) + labelH * 0.25,
-        w: labelW * 0.2,
-        h: labelH * 0.18,
-        type: "Smudge",
-      },
-    ]
-    setDefectBoxes(defects)
-
-    for (const defect of defects) {
-      // Outer glow
-      ctx.shadowColor = "rgba(239, 68, 68, 0.4)"
-      ctx.shadowBlur = 8
-      ctx.strokeStyle = "#ef4444"
-      ctx.lineWidth = 2
-      ctx.strokeRect(defect.x, defect.y, defect.w, defect.h)
-      ctx.shadowBlur = 0
-
-      // Corner markers
-      const cornerLen = 6
-      ctx.strokeStyle = "#ef4444"
-      ctx.lineWidth = 2
-      // Top-left
-      ctx.beginPath()
-      ctx.moveTo(defect.x, defect.y + cornerLen)
-      ctx.lineTo(defect.x, defect.y)
-      ctx.lineTo(defect.x + cornerLen, defect.y)
-      ctx.stroke()
-      // Top-right
-      ctx.beginPath()
-      ctx.moveTo(defect.x + defect.w - cornerLen, defect.y)
-      ctx.lineTo(defect.x + defect.w, defect.y)
-      ctx.lineTo(defect.x + defect.w, defect.y + cornerLen)
-      ctx.stroke()
-      // Bottom-left
-      ctx.beginPath()
-      ctx.moveTo(defect.x, defect.y + defect.h - cornerLen)
-      ctx.lineTo(defect.x, defect.y + defect.h)
-      ctx.lineTo(defect.x + cornerLen, defect.y + defect.h)
-      ctx.stroke()
-      // Bottom-right
-      ctx.beginPath()
-      ctx.moveTo(defect.x + defect.w - cornerLen, defect.y + defect.h)
-      ctx.lineTo(defect.x + defect.w, defect.y + defect.h)
-      ctx.lineTo(defect.x + defect.w, defect.y + defect.h - cornerLen)
-      ctx.stroke()
-
-      // Label
-      ctx.fillStyle = "rgba(239, 68, 68, 0.9)"
-      const labelText = defect.type
-      ctx.font = "10px Inter, system-ui"
-      const textWidth = ctx.measureText(labelText).width
-      ctx.fillRect(
-        defect.x,
-        defect.y - 16,
-        textWidth + 8,
-        14
-      )
-      ctx.fillStyle = "#ffffff"
-      ctx.fillText(labelText, defect.x + 4, defect.y - 5)
+    const defect = {
+      x: gap + 2 * (labelW + gap) + labelW * 0.3,
+      y: gap + 1 * (labelH + gap) + labelH * 0.25,
+      w: labelW * 0.2,
+      h: labelH * 0.18,
+      type: "Smudge",
     }
 
-    // Scan line animation
+    // Outer glow
+    ctx.shadowColor = "rgba(239, 68, 68, 0.4)"
+    ctx.shadowBlur = 8
+    ctx.strokeStyle = "#ef4444"
+    ctx.lineWidth = 2
+    ctx.strokeRect(defect.x, defect.y, defect.w, defect.h)
+    ctx.shadowBlur = 0
+
+    // Corner markers
+    const cornerLen = 6
+    ctx.strokeStyle = "#ef4444"
+    ctx.lineWidth = 2
+    // Top-left
+    ctx.beginPath()
+    ctx.moveTo(defect.x, defect.y + cornerLen)
+    ctx.lineTo(defect.x, defect.y)
+    ctx.lineTo(defect.x + cornerLen, defect.y)
+    ctx.stroke()
+    // Top-right
+    ctx.beginPath()
+    ctx.moveTo(defect.x + defect.w - cornerLen, defect.y)
+    ctx.lineTo(defect.x + defect.w, defect.y)
+    ctx.lineTo(defect.x + defect.w, defect.y + cornerLen)
+    ctx.stroke()
+    // Bottom-left
+    ctx.beginPath()
+    ctx.moveTo(defect.x, defect.y + defect.h - cornerLen)
+    ctx.lineTo(defect.x, defect.y + defect.h)
+    ctx.lineTo(defect.x + cornerLen, defect.y + defect.h)
+    ctx.stroke()
+    // Bottom-right
+    ctx.beginPath()
+    ctx.moveTo(defect.x + defect.w - cornerLen, defect.y + defect.h)
+    ctx.lineTo(defect.x + defect.w, defect.y + defect.h)
+    ctx.lineTo(defect.x + defect.w, defect.y + defect.h - cornerLen)
+    ctx.stroke()
+
+    // Label
+    ctx.fillStyle = "rgba(239, 68, 68, 0.9)"
+    const labelText = defect.type
+    ctx.font = "10px Inter, system-ui"
+    const textWidth = ctx.measureText(labelText).width
+    ctx.fillRect(
+      defect.x,
+      defect.y - 16,
+      textWidth + 8,
+      14
+    )
+    ctx.fillStyle = "#ffffff"
+    ctx.fillText(labelText, defect.x + 4, defect.y - 5)
+  }, [showGrid])
+
+  // Draw static content on the main canvas
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    drawContent(canvas)
+  }, [showGrid, drawContent])
+
+  // Scan line animation on a separate overlay canvas
+  useEffect(() => {
+    const scanCanvas = scanCanvasRef.current
+    if (!scanCanvas) return
+
+    const ctx = scanCanvas.getContext("2d")
+    if (!ctx) return
+
+    const w = scanCanvas.width
+    const h = scanCanvas.height
+
     let scanY = 0
     const animateScan = () => {
-      if (!canvas) return
-      const scanCtx = canvas.getContext("2d")
-      if (!scanCtx) return
-
-      // Only redraw scan line area
-      scanCtx.clearRect(0, scanY - 1, w, 3)
+      ctx.clearRect(0, 0, w, h)
 
       scanY = (scanY + 1) % h
 
-      // Thin scan line
-      const gradient = scanCtx.createLinearGradient(0, 0, w, 0)
+      const gradient = ctx.createLinearGradient(0, 0, w, 0)
       gradient.addColorStop(0, "rgba(22, 141, 106, 0)")
       gradient.addColorStop(0.3, "rgba(22, 141, 106, 0.3)")
       gradient.addColorStop(0.7, "rgba(22, 141, 106, 0.3)")
       gradient.addColorStop(1, "rgba(22, 141, 106, 0)")
-      scanCtx.fillStyle = gradient
-      scanCtx.fillRect(0, scanY, w, 1)
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, scanY, w, 1)
     }
 
     const scanInterval = setInterval(animateScan, 16)
-
     return () => clearInterval(scanInterval)
-  }, [showGrid, zoom, mounted])
+  }, [])
 
   return (
     <div className="flex flex-col h-full">
@@ -281,26 +288,46 @@ export function LiveFeedPanel() {
           </Button>
         </div>
       </div>
-      <div className="flex-1 relative overflow-hidden bg-background">
+      <div ref={containerRef} className="flex-1 relative overflow-hidden bg-background">
         <canvas
           ref={canvasRef}
           width={720}
           height={400}
-          className="w-full h-full object-contain"
+          className="absolute inset-0 w-full h-full object-contain"
           style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
         />
+        <canvas
+          ref={scanCanvasRef}
+          width={720}
+          height={400}
+          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+          style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
+        />
+        {/* Corner vignette */}
+        <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 60px rgba(0,0,0,0.4)" }} />
+        {/* REC indicator */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded bg-destructive/15 border border-destructive/20 backdrop-blur-sm">
+          <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+          <span className="text-[9px] font-mono font-semibold text-destructive tracking-wider">REC</span>
+        </div>
         {/* Defect count overlay */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-card/90 border border-border backdrop-blur-sm">
-          <div className="w-2 h-2 rounded-full bg-destructive" />
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
+          <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
           <span className="text-[10px] font-mono text-foreground">
-            {defectBoxes.length} defect{defectBoxes.length !== 1 ? "s" : ""} detected
+            {DEFECT_COUNT} defect{DEFECT_COUNT !== 1 ? "s" : ""} detected
           </span>
         </div>
         {/* Camera info overlay */}
-        <div className="absolute top-3 right-3 px-2.5 py-1.5 rounded-md bg-card/90 border border-border backdrop-blur-sm">
-          <span className="text-[10px] font-mono text-muted-foreground">
-            CAM-01 | 4000px | 60fps
-          </span>
+        <div className="absolute top-3 right-3 flex items-center gap-2 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
+          <span className="text-[10px] font-mono text-muted-foreground">CAM-01</span>
+          <div className="w-px h-3 bg-border" />
+          <span className="text-[10px] font-mono text-muted-foreground">4000px</span>
+          <div className="w-px h-3 bg-border" />
+          <span className="text-[10px] font-mono text-muted-foreground">60fps</span>
+        </div>
+        {/* Timestamp overlay */}
+        <div className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
+          <span className="text-[10px] font-mono text-muted-foreground">14:32:07</span>
         </div>
       </div>
     </div>

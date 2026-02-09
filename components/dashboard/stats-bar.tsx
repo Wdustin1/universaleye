@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Hash, AlertTriangle, Timer } from "lucide-react"
 
 interface StatItem {
@@ -14,7 +14,7 @@ interface StatItem {
 }
 
 export function StatsBar() {
-  const [mounted, setMounted] = useState(false)
+  const counterRef = useRef(0)
   const [stats, setStats] = useState<StatItem[]>([
     {
       label: "Labels Inspected",
@@ -24,7 +24,7 @@ export function StatsBar() {
     },
     {
       label: "Defects Found",
-      value: "23",
+      value: "10",
       icon: <AlertTriangle className="w-3.5 h-3.5" />,
       accent: "destructive",
     },
@@ -34,22 +34,18 @@ export function StatsBar() {
       icon: <Timer className="w-3.5 h-3.5" />,
       accent: "default",
     },
-
   ])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Simulate live data updates
   useEffect(() => {
-    if (!mounted) return
     const interval = setInterval(() => {
+      counterRef.current += 1
+      const increment = (counterRef.current % 3) + 1
       setStats((prev) =>
         prev.map((stat) => {
           if (stat.label === "Labels Inspected") {
             const current = Number.parseInt(stat.value.replace(/,/g, ""))
-            const next = current + Math.floor(Math.random() * 3) + 1
+            const next = current + increment
             return { ...stat, value: next.toLocaleString() }
           }
 
@@ -58,19 +54,19 @@ export function StatsBar() {
       )
     }, 2000)
     return () => clearInterval(interval)
-  }, [mounted])
+  }, [])
 
   return (
     <div className="flex items-stretch border-b border-border bg-card">
       {stats.map((stat, i) => (
         <div
           key={stat.label}
-          className={`flex-1 flex items-center gap-3 px-4 py-2.5 ${
+          className={`flex-1 flex items-center gap-3 px-5 py-2.5 ${
             i < stats.length - 1 ? "border-r border-border" : ""
           }`}
         >
           <div
-            className={`flex items-center justify-center w-7 h-7 rounded-md ${
+            className={`flex items-center justify-center w-7 h-7 rounded-lg ${
               stat.accent === "destructive"
                 ? "bg-destructive/10 text-destructive"
                 : stat.accent === "success"

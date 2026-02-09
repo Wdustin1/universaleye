@@ -58,3 +58,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(225 12% 18%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(225 12% 24%);
+}
+
+/* Text selection */
+::selection {
+  background: hsl(168 75% 42% / 0.3);
+}
+
+/* Tabular nums for stats/counters */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}

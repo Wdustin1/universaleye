@@ -1,12 +1,12 @@
 "use client"
 
 const DEFECT_DATA = [
-  { type: "Smudge", count: 7, percentage: 30.4 },
-  { type: "Misregister", count: 5, percentage: 21.7 },
-  { type: "Hickey", count: 4, percentage: 17.4 },
-  { type: "Color Shift", count: 3, percentage: 13.0 },
-  { type: "Scratch", count: 2, percentage: 8.7 },
-  { type: "Other", count: 2, percentage: 8.7 },
+  { type: "Smudge", count: 2, percentage: 20.0 },
+  { type: "Color Shift", count: 2, percentage: 20.0 },
+  { type: "Hickey", count: 1, percentage: 10.0 },
+  { type: "Misregister", count: 1, percentage: 10.0 },
+  { type: "Scratch", count: 1, percentage: 10.0 },
+  { type: "Other", count: 3, percentage: 30.0 },
 ]
 
 export function DefectBreakdown() {
@@ -19,39 +19,42 @@ export function DefectBreakdown() {
           Defect Classification
         </h2>
         <span className="text-[10px] font-mono text-muted-foreground">
-          23 total
+          10 total
         </span>
       </div>
-      <div className="flex-1 p-3 flex flex-col gap-2.5">
-        {DEFECT_DATA.map((item) => (
-          <div key={item.type} className="flex items-center gap-3">
-            <span className="text-[10px] text-muted-foreground w-20 text-right truncate">
-              {item.type}
-            </span>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${(item.count / maxCount) * 100}%`,
-                  backgroundColor:
-                    item.count >= 5
-                      ? "hsl(var(--destructive))"
-                      : item.count >= 3
-                        ? "hsl(var(--warning))"
-                        : "hsl(var(--primary))",
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 w-16">
-              <span className="text-[10px] font-mono font-medium text-foreground">
-                {item.count}
+      <div className="flex-1 px-3 py-2 flex flex-col justify-center gap-1.5">
+        {DEFECT_DATA.map((item) => {
+          const color =
+            item.count >= 5
+              ? "hsl(var(--destructive))"
+              : item.count >= 3
+                ? "hsl(var(--warning))"
+                : "hsl(var(--primary))"
+          return (
+            <div key={item.type} className="flex items-center gap-3">
+              <span className="text-[10px] text-muted-foreground w-20 text-right truncate">
+                {item.type}
               </span>
-              <span className="text-[9px] text-muted-foreground">
-                {item.percentage.toFixed(1)}%
-              </span>
+              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${(item.count / maxCount) * 100}%`,
+                    backgroundColor: color,
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 w-16">
+                <span className="text-[10px] font-mono font-semibold text-foreground w-4 text-right">
+                  {item.count}
+                </span>
+                <span className="text-[9px] text-muted-foreground">
+                  {item.percentage.toFixed(1)}%
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

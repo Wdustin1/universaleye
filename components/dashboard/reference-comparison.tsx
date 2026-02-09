@@ -102,30 +102,30 @@ export function ReferenceComparison() {
         )}
       </div>
 
-      <div className="flex items-center justify-between px-3 py-2 border-t border-border">
+      <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-destructive/[0.03]">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground">AI Verdict:</span>
-          <span className="text-[10px] font-medium text-destructive flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">AI Verdict</span>
+          <span className="text-[10px] font-semibold text-destructive flex items-center gap-1 bg-destructive/10 px-2 py-0.5 rounded">
             <X className="w-3 h-3" />
             Reject
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] text-success gap-1 px-2"
+            className="h-6 text-[10px] text-success gap-1 px-2 hover:bg-success/10"
           >
             <Check className="w-3 h-3" />
-            Override: Accept
+            Accept
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] text-destructive gap-1 px-2"
+            className="h-6 text-[10px] text-destructive gap-1 px-2 hover:bg-destructive/10"
           >
             <X className="w-3 h-3" />
-            Confirm Reject
+            Confirm
           </Button>
         </div>
       </div>
@@ -162,10 +162,11 @@ function drawLabel(canvas: HTMLCanvasElement | null, hasDefect: boolean) {
   ctx.font = "bold 10px Inter, system-ui"
   ctx.fillText("PREMIUM RESERVE", pad + 14, pad + 20)
 
-  // Content lines
+  // Content lines (deterministic widths so reference and current match)
+  const lineWidths = [0.78, 0.92, 0.65, 0.85, 0.71]
   const lineY = pad + 34
   for (let i = 0; i < 5; i++) {
-    const lw = (w - pad * 2 - 32) * (0.5 + Math.random() * 0.4)
+    const lw = (w - pad * 2 - 32) * lineWidths[i]
     ctx.fillStyle = i % 2 === 0 ? "#1e2035" : "#22243a"
     ctx.fillRect(pad + 8, lineY + i * 10, lw, 5)
   }
