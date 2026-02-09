@@ -49,11 +49,16 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-muted-foreground px-2.5" onClick={onDefectHistoryClick}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 text-xs px-3 border-border text-foreground hover:bg-accent"
+          onClick={onDefectHistoryClick}
+        >
           <History className="w-3.5 h-3.5" />
           Defect History
           {defectCount !== undefined && defectCount > 0 && (
-            <span className="ml-0.5 text-[10px] font-mono bg-destructive/15 text-destructive px-1.5 py-0.5 rounded">
+            <span className="ml-1 text-[10px] font-mono bg-destructive/15 text-destructive px-1.5 py-0.5 rounded-sm">
               {defectCount}
             </span>
           )}
