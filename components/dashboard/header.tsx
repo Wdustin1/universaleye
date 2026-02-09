@@ -3,11 +3,10 @@
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Settings, Circle, History } from "lucide-react"
-import { useState } from "react"
 
 export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; onDefectHistoryClick?: () => void }) {
-  const [currentJob] = useState("JOB-2026-0247")
-  const [productName] = useState("Premium Wine Label - Merlot Reserve")
+  const currentJob = "JOB-2026-0247"
+  const productName = "Premium Wine Label - Merlot Reserve"
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shadow-[0_1px_3px_0_rgba(0,0,0,0.3)]">

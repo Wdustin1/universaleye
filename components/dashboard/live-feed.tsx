@@ -25,7 +25,6 @@ const DEFECT_COUNT = 1
 export function LiveFeedPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanCanvasRef = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
   const drawContent = useCallback((canvas: HTMLCanvasElement) => {
@@ -215,6 +214,7 @@ export function LiveFeedPanel() {
     const h = scanCanvas.height
 
     let scanY = 0
+    let rafId: number
     const animateScan = () => {
       ctx.clearRect(0, 0, w, h)
 
@@ -227,10 +227,12 @@ export function LiveFeedPanel() {
       gradient.addColorStop(1, "rgba(22, 141, 106, 0)")
       ctx.fillStyle = gradient
       ctx.fillRect(0, scanY, w, 1)
+
+      rafId = requestAnimationFrame(animateScan)
     }
 
-    const scanInterval = setInterval(animateScan, 16)
-    return () => clearInterval(scanInterval)
+    rafId = requestAnimationFrame(animateScan)
+    return () => cancelAnimationFrame(rafId)
   }, [])
 
   return (
@@ -288,11 +290,13 @@ export function LiveFeedPanel() {
           </Button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 relative overflow-hidden bg-background">
+      <div className="flex-1 relative overflow-hidden bg-background">
         <canvas
           ref={canvasRef}
           width={720}
           height={400}
+          role="img"
+          aria-label="Live feed showing label inspection grid with defect detection"
           className="absolute inset-0 w-full h-full object-contain"
           style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
         />

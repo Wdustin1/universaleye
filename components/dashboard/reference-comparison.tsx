@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeftRight, Check, X } from "lucide-react"
+import { Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function ReferenceComparison() {
@@ -46,9 +46,9 @@ export function ReferenceComparison() {
 
       <div className="flex-1 p-3">
         {activeTab === "side-by-side" ? (
-          <div className="flex gap-3 h-full">
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex flex-col gap-2 h-full">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-success" />
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Reference (Golden Master)
@@ -58,16 +58,15 @@ export function ReferenceComparison() {
                 <canvas
                   ref={referenceCanvasRef}
                   width={280}
-                  height={200}
+                  height={120}
+                  role="img"
+                  aria-label="Reference golden master label"
                   className="w-full h-full object-contain"
                 />
               </div>
             </div>
-            <div className="flex items-center">
-              <ArrowLeftRight className="w-3.5 h-3.5 text-muted-foreground" />
-            </div>
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center gap-1.5 mb-2">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Current (Defect #23)
@@ -77,7 +76,9 @@ export function ReferenceComparison() {
                 <canvas
                   ref={currentCanvasRef}
                   width={280}
-                  height={200}
+                  height={120}
+                  role="img"
+                  aria-label="Current label with detected defect"
                   className="w-full h-full object-contain"
                 />
               </div>

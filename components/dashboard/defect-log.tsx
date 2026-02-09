@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { Filter, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,9 +51,19 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
   const [filterType, setFilterType] = useState<string>("All")
   const thumbnailCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
 
-  const filteredDefects = filterType === "All"
-    ? defects
-    : defects.filter((d) => d.type === filterType)
+  const filteredDefects = useMemo(
+    () => filterType === "All" ? defects : defects.filter((d) => d.type === filterType),
+    [defects, filterType]
+  )
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false)
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [open, onOpenChange])
 
   useEffect(() => {
     for (const defect of filteredDefects) {
@@ -139,6 +149,8 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
                     }}
                     width={40}
                     height={40}
+                    role="img"
+                    aria-label={`Thumbnail of ${defect.type} defect #${defect.id}`}
                     className="w-full h-full"
                   />
                 </div>
