@@ -14,7 +14,7 @@ export function DefectBreakdown() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
         <h2 className="text-xs font-medium text-foreground uppercase tracking-wider">
           Defect Classification
         </h2>
@@ -22,7 +22,7 @@ export function DefectBreakdown() {
           10 total
         </span>
       </div>
-      <div className="flex-1 px-3 py-2 flex flex-col justify-center gap-1.5">
+      <div className="flex-1 px-3 py-1 flex flex-col justify-center gap-1">
         {DEFECT_DATA.map((item) => {
           const color =
             item.count >= 5

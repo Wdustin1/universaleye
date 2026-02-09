@@ -142,12 +142,12 @@ export function InspectionControls() {
             Reference
           </p>
           <div className="flex flex-col gap-1.5">
-            <Button variant="ghost" size="sm" className="justify-start h-7 text-xs text-muted-foreground gap-2 px-2">
-              <Camera className="w-3 h-3" />
-              Capture New Reference
+            <Button variant="ghost" size="sm" className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2">
+              <Camera className="w-3 h-3 flex-shrink-0" />
+              New Reference
             </Button>
-            <Button variant="ghost" size="sm" className="justify-start h-7 text-xs text-muted-foreground gap-2 px-2">
-              <RotateCcw className="w-3 h-3" />
+            <Button variant="ghost" size="sm" className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2">
+              <RotateCcw className="w-3 h-3 flex-shrink-0" />
               Reset to Original
             </Button>
           </div>

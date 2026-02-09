@@ -147,7 +147,7 @@ function drawLabel(canvas: HTMLCanvasElement | null, hasDefect: boolean) {
   ctx.fillRect(0, 0, w, h)
 
   // Label container
-  const pad = 16
+  const pad = 10
   ctx.fillStyle = "#1a1c2e"
   ctx.fillRect(pad, pad, w - pad * 2, h - pad * 2)
   ctx.strokeStyle = "#2a2d42"
@@ -156,37 +156,38 @@ function drawLabel(canvas: HTMLCanvasElement | null, hasDefect: boolean) {
 
   // Header
   ctx.fillStyle = "#252840"
-  ctx.fillRect(pad + 8, pad + 8, w - pad * 2 - 16, 18)
+  ctx.fillRect(pad + 6, pad + 6, w - pad * 2 - 12, 14)
 
   // "Brand text"
   ctx.fillStyle = "#6b7194"
-  ctx.font = "bold 10px Inter, system-ui"
-  ctx.fillText("PREMIUM RESERVE", pad + 14, pad + 20)
+  ctx.font = "bold 9px Inter, system-ui"
+  ctx.fillText("PREMIUM RESERVE", pad + 10, pad + 16)
 
   // Content lines (deterministic widths so reference and current match)
-  const lineWidths = [0.78, 0.92, 0.65, 0.85, 0.71]
-  const lineY = pad + 34
-  for (let i = 0; i < 5; i++) {
-    const lw = (w - pad * 2 - 32) * lineWidths[i]
+  const lineWidths = [0.78, 0.92, 0.65, 0.85]
+  const lineY = pad + 26
+  const lineSpacing = 7
+  for (let i = 0; i < 4; i++) {
+    const lw = (w - pad * 2 - 24) * lineWidths[i]
     ctx.fillStyle = i % 2 === 0 ? "#1e2035" : "#22243a"
-    ctx.fillRect(pad + 8, lineY + i * 10, lw, 5)
+    ctx.fillRect(pad + 6, lineY + i * lineSpacing, lw, 4)
   }
 
   // Simulated image area
   ctx.fillStyle = "#191b2d"
-  const imgX = pad + 8 + (w - pad * 2 - 16) * 0.55
+  const imgX = pad + 6 + (w - pad * 2 - 12) * 0.55
   const imgY = lineY
-  const imgW = (w - pad * 2 - 16) * 0.38
-  const imgH = 50
+  const imgW = (w - pad * 2 - 12) * 0.38
+  const imgH = lineSpacing * 3.5
   ctx.fillRect(imgX, imgY, imgW, imgH)
 
   // Color registration bar
   const colors = ["#3a5a8c", "#8c3a5a", "#3a8c5a", "#8c7a3a"]
-  const barY = h - pad - 18
-  const barW = (w - pad * 2 - 16) / colors.length
+  const barY = h - pad - 12
+  const barW = (w - pad * 2 - 12) / colors.length
   for (let i = 0; i < colors.length; i++) {
     ctx.fillStyle = colors[i]
-    ctx.fillRect(pad + 8 + i * barW, barY, barW - 2, 10)
+    ctx.fillRect(pad + 6 + i * barW, barY, barW - 2, 7)
   }
 
   // Draw defect if needed
@@ -194,18 +195,18 @@ function drawLabel(canvas: HTMLCanvasElement | null, hasDefect: boolean) {
     // Smudge defect
     ctx.fillStyle = "rgba(90, 50, 50, 0.6)"
     ctx.beginPath()
-    ctx.ellipse(w * 0.45, h * 0.42, 18, 10, 0.3, 0, Math.PI * 2)
+    ctx.ellipse(w * 0.45, h * 0.45, 14, 8, 0.3, 0, Math.PI * 2)
     ctx.fill()
 
     // Defect highlight box
     ctx.strokeStyle = "#ef4444"
     ctx.lineWidth = 1.5
     ctx.setLineDash([3, 3])
-    ctx.strokeRect(w * 0.45 - 24, h * 0.42 - 16, 48, 32)
+    ctx.strokeRect(w * 0.45 - 18, h * 0.45 - 12, 36, 24)
     ctx.setLineDash([])
 
     // Difference highlight area
     ctx.fillStyle = "rgba(239, 68, 68, 0.08)"
-    ctx.fillRect(w * 0.45 - 24, h * 0.42 - 16, 48, 32)
+    ctx.fillRect(w * 0.45 - 18, h * 0.45 - 12, 36, 24)
   }
 }

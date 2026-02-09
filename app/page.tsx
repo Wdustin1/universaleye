@@ -45,7 +45,7 @@ export default function Page() {
           </div>
 
           {/* Bottom bar: Breakdown */}
-          <div className="h-28 flex-shrink-0 border-t border-border bg-card overflow-hidden">
+          <div className="h-36 flex-shrink-0 border-t border-border bg-card overflow-hidden">
             <DefectBreakdown />
           </div>
         </main>
