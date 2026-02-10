@@ -1,16 +1,31 @@
 "use client"
 
-const DEFECT_DATA = [
-  { type: "Smudge", count: 2, percentage: 20.0 },
-  { type: "Color Shift", count: 2, percentage: 20.0 },
-  { type: "Hickey", count: 1, percentage: 10.0 },
-  { type: "Misregister", count: 1, percentage: 10.0 },
-  { type: "Scratch", count: 1, percentage: 10.0 },
-  { type: "Other", count: 3, percentage: 30.0 },
-]
+import { useEffect, useState } from "react"
+import { API } from "@/lib/api"
+
+interface BreakdownItem {
+  type: string
+  count: number
+  percentage: number
+}
 
 export function DefectBreakdown() {
-  const maxCount = Math.max(...DEFECT_DATA.map((d) => d.count))
+  const [defectData, setDefectData] = useState<BreakdownItem[]>([])
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch(API.defectBreakdown)
+        if (res.ok) setDefectData(await res.json())
+      } catch { /* backend not available */ }
+    }
+    poll()
+    const interval = setInterval(poll, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const totalCount = defectData.reduce((sum, d) => sum + d.count, 0)
+  const maxCount = defectData.length > 0 ? Math.max(...defectData.map((d) => d.count)) : 1
 
   return (
     <div className="flex flex-col h-full">
@@ -19,42 +34,46 @@ export function DefectBreakdown() {
           Defect Classification
         </h2>
         <span className="text-[10px] font-mono text-muted-foreground">
-          10 total
+          {totalCount} total
         </span>
       </div>
       <div className="flex-1 px-3 py-1 flex flex-col justify-center gap-1">
-        {DEFECT_DATA.map((item) => {
-          const color =
-            item.count >= 5
-              ? "hsl(var(--destructive))"
-              : item.count >= 3
-                ? "hsl(var(--warning))"
-                : "hsl(var(--primary))"
-          return (
-            <div key={item.type} className="flex items-center gap-3">
-              <span className="text-[10px] text-muted-foreground w-20 text-right truncate">
-                {item.type}
-              </span>
-              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${(item.count / maxCount) * 100}%`,
-                    backgroundColor: color,
-                  }}
-                />
-              </div>
-              <div className="flex items-center gap-1.5 w-16">
-                <span className="text-[10px] font-mono font-semibold text-foreground w-4 text-right">
-                  {item.count}
+        {defectData.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground text-center">No defects detected</p>
+        ) : (
+          defectData.map((item) => {
+            const color =
+              item.count >= 5
+                ? "hsl(var(--destructive))"
+                : item.count >= 3
+                  ? "hsl(var(--warning))"
+                  : "hsl(var(--primary))"
+            return (
+              <div key={item.type} className="flex items-center gap-3">
+                <span className="text-[10px] text-muted-foreground w-20 text-right truncate">
+                  {item.type}
                 </span>
-                <span className="text-[9px] text-muted-foreground">
-                  {item.percentage.toFixed(1)}%
-                </span>
+                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(item.count / maxCount) * 100}%`,
+                      backgroundColor: color,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 w-16">
+                  <span className="text-[10px] font-mono font-semibold text-foreground w-4 text-right">
+                    {item.count}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground">
+                    {item.percentage.toFixed(1)}%
+                  </span>
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })
+        )}
       </div>
     </div>
   )

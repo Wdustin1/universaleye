@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Hash, AlertTriangle, Timer } from "lucide-react"
+import { API } from "@/lib/api"
 
 type Accent = "default" | "destructive" | "success" | "warning"
 
@@ -12,24 +13,36 @@ const STATS_CONFIG: { label: string; key: string; icon: typeof Hash; accent: Acc
 ]
 
 export function StatsBar() {
-  const counterRef = useRef(0)
-  const [labelsInspected, setLabelsInspected] = useState(12847)
+  const [stats, setStats] = useState({
+    labelsInspected: 0,
+    defectsFound: 0,
+    runTime: "00:00:00",
+  })
 
-  const values: Record<string, string> = {
-    labelsInspected: labelsInspected.toLocaleString(),
-    defectsFound: "10",
-    runTime: "02:34:18",
-  }
-
-  // Simulate live data updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      counterRef.current += 1
-      const increment = (counterRef.current % 3) + 1
-      setLabelsInspected((prev) => prev + increment)
-    }, 2000)
+    const poll = async () => {
+      try {
+        const res = await fetch(API.stats)
+        if (res.ok) {
+          const data = await res.json()
+          setStats({
+            labelsInspected: data.labelsInspected ?? 0,
+            defectsFound: data.defectsFound ?? 0,
+            runTime: data.runTime ?? "00:00:00",
+          })
+        }
+      } catch { /* backend not available */ }
+    }
+    poll()
+    const interval = setInterval(poll, 2000)
     return () => clearInterval(interval)
   }, [])
+
+  const values: Record<string, string> = {
+    labelsInspected: stats.labelsInspected.toLocaleString(),
+    defectsFound: String(stats.defectsFound),
+    runTime: stats.runTime,
+  }
 
   return (
     <div className="flex items-stretch border-b border-border bg-card">

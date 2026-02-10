@@ -10,12 +10,57 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { API } from "@/lib/api"
 
 type InspectionState = "running" | "paused" | "stopped"
 
 export function InspectionControls() {
-  const [state, setState] = useState<InspectionState>("running")
+  const [state, setState] = useState<InspectionState>("stopped")
   const [sensitivity, setSensitivity] = useState(75)
+
+  const handleStart = async () => {
+    try {
+      await fetch(API.inspectionStart, { method: "POST" })
+      setState("running")
+    } catch { /* backend not available */ }
+  }
+
+  const handlePause = async () => {
+    try {
+      await fetch(API.inspectionPause, { method: "POST" })
+      setState("paused")
+    } catch { /* backend not available */ }
+  }
+
+  const handleStop = async () => {
+    try {
+      await fetch(API.inspectionStop, { method: "POST" })
+      setState("stopped")
+    } catch { /* backend not available */ }
+  }
+
+  const handleSensitivity = async (value: number) => {
+    setSensitivity(value)
+    try {
+      await fetch(API.sensitivity, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sensitivity: value }),
+      })
+    } catch { /* backend not available */ }
+  }
+
+  const handleNewReference = async () => {
+    try {
+      await fetch(API.setReference, { method: "POST" })
+    } catch { /* backend not available */ }
+  }
+
+  const handleResetReference = async () => {
+    try {
+      await fetch(API.resetReference, { method: "POST" })
+    } catch { /* backend not available */ }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -35,7 +80,7 @@ export function InspectionControls() {
             {/* Start / Resume */}
             <button
               type="button"
-              onClick={() => setState("running")}
+              onClick={handleStart}
               className={`relative flex items-center justify-center gap-2.5 w-full h-11 rounded-lg text-sm font-medium transition-all ${
                 state === "running"
                   ? "bg-primary text-primary-foreground shadow-[0_0_12px_hsl(168_75%_42%/0.3)]"
@@ -53,7 +98,7 @@ export function InspectionControls() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setState("paused")}
+                onClick={handlePause}
                 className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
                   state === "paused"
                     ? "bg-warning/15 text-warning border border-warning/30"
@@ -66,7 +111,7 @@ export function InspectionControls() {
 
               <button
                 type="button"
-                onClick={() => setState("stopped")}
+                onClick={handleStop}
                 className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
                   state === "stopped"
                     ? "bg-destructive/15 text-destructive border border-destructive/30"
@@ -125,7 +170,7 @@ export function InspectionControls() {
               min="0"
               max="100"
               value={sensitivity}
-              onChange={(e) => setSensitivity(Number(e.target.value))}
+              onChange={(e) => handleSensitivity(Number(e.target.value))}
               className="absolute inset-0 w-full opacity-0 cursor-pointer"
               aria-label="Detection sensitivity"
             />
@@ -142,11 +187,21 @@ export function InspectionControls() {
             Reference
           </p>
           <div className="flex flex-col gap-1.5">
-            <Button variant="ghost" size="sm" className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2"
+              onClick={handleNewReference}
+            >
               <Camera className="w-3 h-3 flex-shrink-0" />
               New Reference
             </Button>
-            <Button variant="ghost" size="sm" className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2"
+              onClick={handleResetReference}
+            >
               <RotateCcw className="w-3 h-3 flex-shrink-0" />
               Reset to Original
             </Button>

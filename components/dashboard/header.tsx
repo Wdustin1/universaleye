@@ -4,7 +4,15 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Settings, Circle, History } from "lucide-react"
 
-export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; onDefectHistoryClick?: () => void }) {
+type StatusType = "running" | "paused" | "stopped"
+
+const statusMap: Record<StatusType, "inspecting" | "idle" | "paused" | "error"> = {
+  running: "inspecting",
+  paused: "paused",
+  stopped: "idle",
+}
+
+export function DashboardHeader({ defectCount, status = "stopped", onDefectHistoryClick }: { defectCount?: number; status?: StatusType; onDefectHistoryClick?: () => void }) {
   const currentJob = "JOB-2026-0247"
   const productName = "Premium Wine Label - Merlot Reserve"
 
@@ -32,7 +40,7 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
         <div className="h-6 w-px bg-border" />
 
         <div className="flex items-center gap-3">
-          <StatusIndicator status="inspecting" />
+          <StatusIndicator status={statusMap[status]} />
           <div>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active Job</p>
             <p className="text-sm font-medium font-mono text-foreground">{currentJob}</p>

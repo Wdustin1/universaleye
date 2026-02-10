@@ -485,3 +485,70 @@ All 14 targeted findings were fixed and verified. Build and lint pass cleanly.
 ### Final verification:
 - `pnpm build` -- passed (0 errors, TypeScript checking now enabled)
 - `pnpm lint` -- passed (0 errors, 0 warnings)
+
+---
+
+## Python Backend Implementation (2026-02-10)
+
+### What was built:
+
+**Python/FastAPI backend** for real-time label inspection using computer vision. The backend replaces all mock data in the frontend with real API endpoints.
+
+### Backend files created (`backend/`):
+
+| File | Purpose |
+|------|---------|
+| `pyproject.toml` | Project metadata + dependencies |
+| `requirements.txt` | Flat dependency list |
+| `config.py` | All tunable thresholds (camera, motion, SSIM, CORS) |
+| `models.py` | Pydantic models matching frontend TypeScript interfaces |
+| `state_machine.py` | Motion detection: MONITORING → MOTION → STABILIZING → INSPECT |
+| `inspector.py` | SSIM-based defect comparison + severity/type classification |
+| `capture.py` | Background capture thread + CaptureManager (central coordinator) |
+| `main.py` | FastAPI app: 14 routes, MJPEG stream, SSE events, lifecycle |
+| `tests/conftest.py` | Synthetic image fixtures for testing |
+| `tests/test_config.py` | Config threshold tests |
+| `tests/test_models.py` | Model serialization tests |
+| `tests/test_state_machine.py` | State transition tests |
+| `tests/test_inspector.py` | SSIM inspection tests |
+| `tests/test_capture.py` | CaptureManager unit tests |
+| `tests/test_api.py` | FastAPI integration tests |
+
+### Frontend files modified:
+
+| File | Change |
+|------|--------|
+| `lib/api.ts` | Created: API URL constants |
+| `components/dashboard/live-feed.tsx` | Canvas → MJPEG `<img>` stream |
+| `components/dashboard/reference-comparison.tsx` | Canvas → `<img>` from API |
+| `components/dashboard/stats-bar.tsx` | Mock data → polls `/api/stats` |
+| `components/dashboard/defect-log.tsx` | Mock data → `/api/defects` + SSE |
+| `components/dashboard/inspection-controls.tsx` | Buttons → POST/PUT to backend |
+| `components/dashboard/defect-breakdown.tsx` | Mock data → polls `/api/defect_breakdown` |
+| `app/page.tsx` | Added stats polling, passes live data to header |
+| `components/dashboard/header.tsx` | Accepts `status` prop from live backend |
+| `.gitignore` | Added Python backend ignores |
+
+### Key architecture decisions:
+- Background thread (not asyncio) for OpenCV video capture (blocking C calls)
+- `threading.Lock` for shared frame data between capture thread and API routes
+- MJPEG streaming via `multipart/x-mixed-replace` (consumed by simple `<img>` tag)
+- SSE via `sse-starlette` for real-time defect notifications
+- State machine triggers inspection only when labels stop moving (avoids blurry frames)
+- Graceful "NO CAMERA SIGNAL" fallback when no capture device is available
+
+### Test results:
+- **51 backend tests** — all passing
+- **Frontend build** — passes with 0 errors
+- No real camera required for testing (synthetic images used)
+
+### How to run:
+```bash
+# Terminal 1: Backend
+cd backend && source .venv/bin/activate && python main.py
+
+# Terminal 2: Frontend
+pnpm dev
+```
+
+Open http://localhost:3000 — dashboard connects to backend at http://localhost:8000.
