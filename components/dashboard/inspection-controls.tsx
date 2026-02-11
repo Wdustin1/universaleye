@@ -14,7 +14,7 @@ import { API } from "@/lib/api"
 
 type InspectionState = "running" | "paused" | "stopped"
 
-export function InspectionControls() {
+export function InspectionControls({ hasReference = true }: { hasReference?: boolean }) {
   const [state, setState] = useState<InspectionState>("stopped")
   const [sensitivity, setSensitivity] = useState(75)
 
@@ -81,10 +81,13 @@ export function InspectionControls() {
             <button
               type="button"
               onClick={handleStart}
+              disabled={!hasReference && state !== "running"}
               className={`relative flex items-center justify-center gap-2.5 w-full h-11 rounded-lg text-sm font-medium transition-all ${
-                state === "running"
-                  ? "bg-primary text-primary-foreground shadow-[0_0_12px_hsl(168_75%_42%/0.3)]"
-                  : "bg-secondary text-secondary-foreground hover:bg-accent"
+                !hasReference && state !== "running"
+                  ? "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
+                  : state === "running"
+                    ? "bg-primary text-primary-foreground shadow-[0_0_12px_hsl(168_75%_42%/0.3)]"
+                    : "bg-secondary text-secondary-foreground hover:bg-accent"
               }`}
             >
               {state === "running" && (
@@ -93,6 +96,9 @@ export function InspectionControls() {
               <Play className="w-4 h-4" />
               {state === "paused" ? "Resume" : "Start"}
             </button>
+            {!hasReference && state !== "running" && (
+              <p className="text-[9px] text-warning text-center">Set a reference image first</p>
+            )}
 
             {/* Pause / Stop row */}
             <div className="flex items-center gap-2">

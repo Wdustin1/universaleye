@@ -14,8 +14,9 @@ export default function Page() {
   const [defectLogOpen, setDefectLogOpen] = useState(false)
   const [defectCount, setDefectCount] = useState(0)
   const [status, setStatus] = useState<"running" | "paused" | "stopped">("stopped")
+  const [hasReference, setHasReference] = useState(false)
 
-  // Poll stats for header defect count and status
+  // Poll stats and reference status
   useEffect(() => {
     const poll = async () => {
       try {
@@ -25,6 +26,10 @@ export default function Page() {
           setDefectCount(data.defectsFound ?? 0)
           setStatus(data.status ?? "stopped")
         }
+      } catch { /* backend not available */ }
+      try {
+        const refRes = await fetch(API.referenceImage, { method: "HEAD" })
+        setHasReference(refRes.status === 200)
       } catch { /* backend not available */ }
     }
     poll()
@@ -48,7 +53,7 @@ export default function Page() {
       <div className="flex-1 flex min-h-0">
         {/* Left Column: Controls */}
         <aside className="w-44 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
-          <InspectionControls />
+          <InspectionControls hasReference={hasReference} />
         </aside>
 
         {/* Center: Main viewport */}
@@ -57,7 +62,7 @@ export default function Page() {
           <div className="flex-1 flex min-h-0">
             {/* Live Feed - dominant panel */}
             <div className="flex-[5] min-w-0 border-r border-border bg-card overflow-hidden">
-              <LiveFeedPanel />
+              <LiveFeedPanel hasReference={hasReference} />
             </div>
             {/* Reference Comparison */}
             <div className="flex-[2] min-w-0 bg-card overflow-hidden">

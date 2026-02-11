@@ -7,11 +7,12 @@ import {
   ZoomOut,
   RotateCcw,
   Grid3X3,
+  Camera,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API } from "@/lib/api"
 
-export function LiveFeedPanel() {
+export function LiveFeedPanel({ hasReference = true }: { hasReference?: boolean }) {
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
   const [defectCount, setDefectCount] = useState(0)
@@ -135,6 +136,32 @@ export function LiveFeedPanel() {
         <div className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
           <span className="text-[10px] font-mono text-muted-foreground">{timestamp}</span>
         </div>
+        {/* Onboarding overlay — no golden reference set */}
+        {!hasReference && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-4 max-w-xs text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">No Reference Image Set</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Position a known good label under the camera, then capture it as the golden reference.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try { await fetch(API.setReference, { method: "POST" }) } catch { /* */ }
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                Capture Reference
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
