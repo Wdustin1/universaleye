@@ -561,17 +561,17 @@ Open http://localhost:3000 — dashboard connects to backend at http://localhost
 
 ### Plan:
 
-- [ ] **1. Add `hasReference` state to `page.tsx`** — poll `/api/reference_image` with HEAD request every 2s. If 204 → no reference. If 200 → reference exists. Pass `hasReference` as prop to `LiveFeedPanel`.
+- [x] **1. Add `hasReference` state to `page.tsx`** — poll `/api/reference_image` with HEAD request every 2s. If 204 → no reference. If 200 → reference exists. Pass `hasReference` as prop to `LiveFeedPanel`.
 
-- [ ] **2. Add onboarding overlay to `LiveFeedPanel`** — when `hasReference === false`, show a centered overlay on top of the live feed with:
+- [x] **2. Add onboarding overlay to `LiveFeedPanel`** — when `hasReference === false`, show a centered overlay on top of the live feed with:
   - "No Reference Image Set" heading
   - "Position a known good label under the camera, then capture it as the golden reference." instructions
   - A "Capture Reference" button that calls `POST /api/set_reference`
   - Overlay dismisses automatically when reference is set (next poll returns 200)
 
-- [ ] **3. Block "Start" button when no reference** — in `InspectionControls`, accept `hasReference` prop. Disable the Start button and show "Set reference first" tooltip when `hasReference === false`.
+- [x] **3. Block "Start" button when no reference** — in `InspectionControls`, accept `hasReference` prop. Disable the Start button and show "Set reference first" tooltip when `hasReference === false`.
 
-- [ ] **4. Build + verify** — `pnpm build` passes, no errors.
+- [x] **4. Build + verify** — `pnpm build` passes, no errors.
 
 ### Files touched:
 - `app/page.tsx` — add hasReference polling, pass prop down
