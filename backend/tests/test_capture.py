@@ -1,5 +1,6 @@
 """Tests for CaptureManager (without real camera)."""
 
+import cv2
 import numpy as np
 
 from capture import CaptureManager
@@ -77,3 +78,52 @@ class TestCaptureManager:
         cm = CaptureManager(test_config, test_db)
         frame = cm._generate_placeholder_frame()
         assert frame.shape == (test_config.camera_height, test_config.camera_width, 3)
+
+
+class TestMotionBlur:
+    def test_blur_kernel_applied_to_gray_frames(self, test_config):
+        """Verify that motion_blur_kernel causes blur to be applied to gray frames."""
+        from state_machine import MotionStateMachine
+
+        # Enable blur
+        test_config.motion_blur_kernel = 5
+        sm = MotionStateMachine(test_config)
+
+        # Create a frame
+        frame = np.full((100, 100, 3), 128, dtype=np.uint8)
+        frame[40:60, 40:60] = 200
+
+        # Process it
+        sm.process_frame(frame)
+
+        # prev_gray should be stored as blurred version
+        # Manually compute what it should be
+        gray_raw = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray_blurred = cv2.GaussianBlur(gray_raw, (5, 5), 0)
+
+        # Check that prev_gray matches the blurred version, not the raw
+        assert np.array_equal(sm.prev_gray, gray_blurred), (
+            "prev_gray should be the blurred version when motion_blur_kernel > 1"
+        )
+
+    def test_no_blur_when_kernel_is_one(self, test_config):
+        """Verify that motion_blur_kernel=1 disables blur."""
+        from state_machine import MotionStateMachine
+
+        # Disable blur
+        test_config.motion_blur_kernel = 1
+        sm = MotionStateMachine(test_config)
+
+        # Create a frame
+        frame = np.full((100, 100, 3), 128, dtype=np.uint8)
+        frame[40:60, 40:60] = 200
+
+        # Process it
+        sm.process_frame(frame)
+
+        # prev_gray should be stored as raw gray (no blur)
+        gray_raw = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        assert np.array_equal(sm.prev_gray, gray_raw), (
+            "prev_gray should be raw gray when motion_blur_kernel <= 1"
+        )

@@ -58,6 +58,10 @@ class MotionStateMachine:
         If state is INSPECT, caller should read self.locked_frame.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Apply Gaussian blur to suppress camera jitter before motion detection
+        k = self.config.motion_blur_kernel
+        if k > 1:
+            gray = cv2.GaussianBlur(gray, (k, k), 0)
         motion_ratio = self.compute_motion_ratio(gray)
         self.prev_gray = gray
 
