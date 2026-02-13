@@ -28,6 +28,7 @@ class InspectionConfig:
     # ORB feature matching alignment
     orb_features: int = 500         # max ORB keypoints to detect
     orb_min_matches: int = 10       # minimum good matches for homography
+    alignment_border_margin: int = 3  # extra pixels to erode beyond detected shift
     # State machine motion blur
     motion_blur_kernel: int = 5     # Gaussian blur kernel for jitter suppression
 

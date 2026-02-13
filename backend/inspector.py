@@ -39,11 +39,16 @@ def align_frame(
     orb_features: int = 500,
     min_matches: int = 10,
 ) -> tuple[np.ndarray, np.ndarray | None, float]:
-    """Align *frame_gray* to *ref_gray* using ORB feature matching + homography.
+    """Align *frame_gray* to *ref_gray* using ORB + rigid affine transform.
 
-    Returns (aligned_frame, homography_matrix, confidence).
-    - confidence is the ratio of RANSAC inliers to total matches (0-1).
-    - If not enough matches, returns (frame_gray, None, 0.0).
+    Uses ``estimateAffinePartial2D`` (4 DOF: translation, rotation, uniform
+    scale) instead of a full homography.  Labels on a flexo web only
+    translate (with perhaps tiny rotation), so the constrained model avoids
+    the perspective/scale artefacts a full homography can introduce.
+
+    Returns ``(aligned_frame, affine_2x3_matrix, confidence)``.
+    *confidence* is the RANSAC inlier ratio (0-1).
+    If alignment fails, returns ``(frame_gray, None, 0.0)``.
     """
     orb = cv2.ORB_create(nfeatures=orb_features)
     kp1, des1 = orb.detectAndCompute(ref_gray, None)
@@ -73,24 +78,26 @@ def align_frame(
     src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
 
-    H, mask = cv2.findHomography(dst_pts, src_pts, cv2.RANSAC, 5.0)
+    A, inliers_mask = cv2.estimateAffinePartial2D(
+        dst_pts, src_pts, method=cv2.RANSAC, ransacReprojThreshold=5.0,
+    )
 
-    if H is None:
-        logger.debug("Homography computation failed")
+    if A is None:
+        logger.debug("Affine estimation failed")
         return frame_gray, None, 0.0
 
-    inliers = int(mask.sum()) if mask is not None else 0
+    inliers = int(inliers_mask.sum()) if inliers_mask is not None else 0
     confidence = inliers / len(good) if good else 0.0
 
     if confidence < 0.3:
-        logger.debug("Homography confidence %.2f too low", confidence)
+        logger.debug("Affine confidence %.2f too low", confidence)
         return frame_gray, None, confidence
 
     h, w = ref_gray.shape
-    aligned = cv2.warpPerspective(frame_gray, H, (w, h),
-                                  borderMode=cv2.BORDER_REPLICATE)
+    aligned = cv2.warpAffine(frame_gray, A, (w, h),
+                             borderMode=cv2.BORDER_REPLICATE)
 
-    return aligned, H, confidence
+    return aligned, A, confidence
 
 
 # ------ Inspection helpers ------
@@ -229,10 +236,20 @@ def inspect_frame(
 
     logger.debug("ORB aligned frame: confidence=%.2f", confidence)
 
-    # Build validity mask — warp a white image to find valid pixels
+    # Build validity mask — warp a white image to find valid pixels,
+    # then exclude a border strip to prevent alignment edge artifacts.
     h, w = gray_ref.shape
     ones = np.ones((h, w), dtype=np.uint8) * 255
-    valid_mask = cv2.warpPerspective(ones, H, (w, h)) > 128
+    valid_mask = cv2.warpAffine(ones, H, (w, h)) > 128
+
+    tx, ty = abs(H[0, 2]), abs(H[1, 2])
+    margin = int(max(tx, ty)) + config.alignment_border_margin
+    if margin > 0:
+        valid_mask[:margin, :] = False
+        valid_mask[-margin:, :] = False
+        valid_mask[:, :margin] = False
+        valid_mask[:, -margin:] = False
+
     valid_ratio = valid_mask.sum() / valid_mask.size
 
     if valid_ratio < 0.5:
@@ -258,7 +275,7 @@ def inspect_frame(
     # --- Per-channel SSIM for global detection (colour-plane defects) ---
     aligned_color = frame.copy()
     for c in range(3):
-        aligned_color[:, :, c] = cv2.warpPerspective(
+        aligned_color[:, :, c] = cv2.warpAffine(
             frame[:, :, c], H, (w, h),
             borderMode=cv2.BORDER_REPLICATE,
         )
