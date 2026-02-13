@@ -2,59 +2,28 @@
 
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Settings, Circle, History } from "lucide-react"
+import { History } from "lucide-react"
 
-type StatusType = "running" | "paused" | "stopped"
-
-const statusMap: Record<StatusType, "inspecting" | "idle" | "paused" | "error"> = {
-  running: "inspecting",
-  paused: "paused",
-  stopped: "idle",
-}
-
-export function DashboardHeader({ defectCount, status = "stopped", onDefectHistoryClick }: { defectCount?: number; status?: StatusType; onDefectHistoryClick?: () => void }) {
-  const currentJob = "JOB-2026-0247"
-  const productName = "Premium Wine Label - Merlot Reserve"
-
+export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; status?: string; onDefectHistoryClick?: () => void }) {
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shadow-[0_1px_3px_0_rgba(0,0,0,0.3)]">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2.5">
-          <Image
-            src="/logo.jpg"
-            alt="Universal Eye"
-            width={32}
-            height={32}
-            className="rounded-md"
-          />
-          <div>
-            <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
-              Universal Eye
-            </h1>
-            <p className="text-[10px] text-muted-foreground tracking-widest uppercase">
-              Web Monitoring System
-            </p>
-          </div>
-        </div>
+      <div />
 
-        <div className="h-6 w-px bg-border" />
-
-        <div className="flex items-center gap-3">
-          <StatusIndicator status={statusMap[status]} />
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active Job</p>
-            <p className="text-sm font-medium font-mono text-foreground">{currentJob}</p>
-          </div>
-        </div>
-
-        <div className="h-6 w-px bg-border" />
-
-        <div className="flex items-center gap-2">
-          <div className="w-0.5 h-7 rounded-full bg-primary/40" />
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Product</p>
-            <p className="text-sm text-foreground">{productName}</p>
-          </div>
+      <div className="flex items-center gap-2.5">
+        <Image
+          src="/logo.jpg"
+          alt="Universal Eye"
+          width={32}
+          height={32}
+          className="rounded-md"
+        />
+        <div>
+          <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
+            Universal Eye
+          </h1>
+          <p className="text-[10px] text-muted-foreground tracking-widest uppercase">
+            Web Monitoring System
+          </p>
         </div>
       </div>
 
@@ -72,10 +41,6 @@ export function DashboardHeader({ defectCount, status = "stopped", onDefectHisto
               {defectCount}
             </span>
           )}
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Settings className="w-4 h-4 text-muted-foreground" />
-          <span className="sr-only">Settings</span>
         </Button>
       </div>
     </header>

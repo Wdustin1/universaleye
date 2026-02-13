@@ -91,8 +91,8 @@ async def video_feed():
 async def reference_image():
     jpeg = capture_manager.get_reference_jpeg()
     if jpeg is None:
-        return Response(status_code=204)
-    return Response(content=jpeg, media_type="image/jpeg")
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
+    return Response(content=jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/current_capture")

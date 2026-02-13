@@ -16,7 +16,7 @@ export default function Page() {
   const [status, setStatus] = useState<"running" | "paused" | "stopped">("stopped")
   const [hasReference, setHasReference] = useState(false)
 
-  // Poll stats and reference status
+  // Poll stats (includes reference status)
   useEffect(() => {
     const poll = async () => {
       try {
@@ -25,11 +25,8 @@ export default function Page() {
           const data = await res.json()
           setDefectCount(data.defectsFound ?? 0)
           setStatus(data.status ?? "stopped")
+          setHasReference(data.hasReference ?? false)
         }
-      } catch { /* backend not available */ }
-      try {
-        const refRes = await fetch(API.referenceImage, { method: "HEAD" })
-        setHasReference(refRes.status === 200)
       } catch { /* backend not available */ }
     }
     poll()
@@ -62,7 +59,7 @@ export default function Page() {
           <div className="flex-1 flex min-h-0">
             {/* Live Feed - dominant panel */}
             <div className="flex-[5] min-w-0 border-r border-border bg-card overflow-hidden">
-              <LiveFeedPanel hasReference={hasReference} />
+              <LiveFeedPanel hasReference={hasReference} onReferenceSet={() => setHasReference(true)} />
             </div>
             {/* Reference Comparison */}
             <div className="flex-[2] min-w-0 bg-card overflow-hidden">

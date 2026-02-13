@@ -66,12 +66,21 @@ def noisy_frame(blank_frame: np.ndarray) -> np.ndarray:
 
 @pytest.fixture
 def reference_label() -> np.ndarray:
-    """Synthetic 'golden master' label image (200x100 BGR)."""
-    img = np.full((100, 200, 3), 200, dtype=np.uint8)
-    img[20:40, 30:170] = 50
-    img[80:95, 30:80] = [180, 50, 50]
-    img[80:95, 80:130] = [50, 180, 50]
-    img[80:95, 130:170] = [50, 50, 180]
+    """Synthetic 'golden master' label image (400x200 BGR).
+
+    Large enough for template matching to work reliably.
+    Contains text-like dark bars and colour blocks.
+    """
+    img = np.full((200, 400, 3), 200, dtype=np.uint8)
+    # Text-like dark bars
+    img[40:80, 60:340] = 50
+    img[100:120, 60:340] = 70
+    # Colour blocks at bottom
+    img[160:190, 60:160] = [180, 50, 50]
+    img[160:190, 160:260] = [50, 180, 50]
+    img[160:190, 260:340] = [50, 50, 180]
+    # Some detail in the top area
+    img[20:30, 80:320] = 120
     return img
 
 
@@ -87,10 +96,8 @@ def good_label(reference_label: np.ndarray) -> np.ndarray:
 
 @pytest.fixture
 def defective_label(reference_label: np.ndarray) -> np.ndarray:
-    """Label with a large visible defect (smudge covering text area)."""
+    """Label with a localised defect — realistic small smudge/hickey."""
     img = reference_label.copy()
-    # Large white smudge covering most of the text area
-    img[15:45, 40:160] = 240
-    # Also corrupt some of the color bars
-    img[75:95, 40:140] = 200
+    # Smudge covering part of the text area (not all of it)
+    img[45:70, 120:200] = 240
     return img

@@ -1,9 +1,9 @@
 """SSIM-based defect inspection and classification.
 
 Compares a captured frame against a golden reference image using
-Structural Similarity Index (SSIM). Before comparison, the frame
-is aligned to the reference via phase correlation so that camera
-drift / operator adjustments don't trigger false defects.
+Structural Similarity Index (SSIM).  Before comparison, the frame
+is aligned to the reference via template matching so that label
+drift on the web doesn't trigger false defects.
 """
 
 from __future__ import annotations
@@ -31,51 +31,78 @@ DEFECT_TYPES = [
 ]
 
 
+# ------ Alignment via template matching ------
+
+def locate_label(
+    frame_gray: np.ndarray,
+    ref_gray: np.ndarray,
+    margin_pct: float = 0.15,
+) -> tuple[int, int, float]:
+    """Find the label offset using template matching.
+
+    Crops the central portion of the reference (avoiding edges that
+    may be background) and searches for it in the current frame.
+    Much more robust than phase correlation for large shifts — finds
+    the label wherever it is in the frame.
+
+    Returns (dx, dy, confidence) where dx/dy is how much the frame
+    content is shifted relative to the reference, and confidence is
+    the normalised correlation score (0–1).
+    """
+    h, w = ref_gray.shape
+    my = int(h * margin_pct)
+    mx = int(w * margin_pct)
+    template = ref_gray[my : h - my, mx : w - mx]
+
+    result = cv2.matchTemplate(frame_gray, template, cv2.TM_CCOEFF_NORMED)
+    _, confidence, _, max_loc = cv2.minMaxLoc(result)
+
+    # max_loc is where the template top-left was found in the frame.
+    # The template was cut from (mx, my) in the reference, so the
+    # offset of the frame relative to the reference is:
+    dx = max_loc[0] - mx
+    dy = max_loc[1] - my
+
+    return dx, dy, float(confidence)
+
+
 def align_frame(
     frame_gray: np.ndarray,
     ref_gray: np.ndarray,
-    max_shift: float = 50.0,
-    min_shift: float = 1.0,
-) -> tuple[np.ndarray, float, float]:
-    """Align *frame_gray* to *ref_gray* using phase correlation.
+    max_shift: int = 200,
+    min_confidence: float = 0.3,
+) -> tuple[np.ndarray, int, int, float]:
+    """Align *frame_gray* to *ref_gray* using template matching.
 
-    Phase correlation uses FFT to detect the translational offset between
-    two images.  It's fast (single FFT pair), sub-pixel accurate, and
-    handles the kind of drift seen on the ELSCAN camera feed.
-
-    Returns (aligned_frame, dx, dy).  If the detected shift exceeds
-    *max_shift* in either axis the frame is returned unchanged — a huge
-    jump likely means a scene change rather than drift.  Shifts below
-    *min_shift* are ignored (phaseCorrelate has a ~0.5 px DC bias on
-    near-identical images that would introduce interpolation noise).
+    Returns (aligned_frame, dx, dy, confidence).  If the match
+    confidence is too low or the shift exceeds *max_shift*, the
+    frame is returned unchanged.
     """
-    shift, _response = cv2.phaseCorrelate(
-        ref_gray.astype(np.float64),
-        frame_gray.astype(np.float64),
-    )
-    dx, dy = shift  # how much frame is shifted relative to ref
+    dx, dy, confidence = locate_label(frame_gray, ref_gray)
+
+    if confidence < min_confidence:
+        logger.debug(
+            "Template match confidence %.2f below threshold %.2f; skipping alignment",
+            confidence, min_confidence,
+        )
+        return frame_gray, 0, 0, confidence
 
     if abs(dx) > max_shift or abs(dy) > max_shift:
-        logger.debug("Shift (%.1f, %.1f) exceeds max_shift; skipping alignment", dx, dy)
-        return frame_gray, 0.0, 0.0
+        logger.debug("Shift (%d, %d) exceeds max_shift %d", dx, dy, max_shift)
+        return frame_gray, 0, 0, confidence
 
-    if abs(dx) < min_shift and abs(dy) < min_shift:
-        return frame_gray, 0.0, 0.0
-
-    # Round to integer pixels.  Sub-pixel warpAffine introduces bilinear
-    # interpolation blur that degrades SSIM across the whole image.
-    # Integer translation is exact — no new artifacts, only border
-    # replication (which we mask out later).
-    dx = round(dx)
-    dy = round(dy)
+    if dx == 0 and dy == 0:
+        return frame_gray, 0, 0, confidence
 
     M = np.float32([[1, 0, -dx], [0, 1, -dy]])
     aligned = cv2.warpAffine(
         frame_gray, M, (frame_gray.shape[1], frame_gray.shape[0]),
         borderMode=cv2.BORDER_REPLICATE,
     )
-    return aligned, dx, dy
+    return aligned, dx, dy, confidence
 
+
+# ------ Inspection helpers ------
 
 class InspectionResult:
     __slots__ = (
@@ -167,6 +194,15 @@ def classify_defect_type(diff_image: np.ndarray) -> str:
     return "Smudge"
 
 
+_SKIP = InspectionResult(
+    is_defect=False, ssim_score=1.0, worst_block_score=1.0,
+    defect_type="", severity=None, ai_verdict=AIVerdict.accept,
+    diff_image=None,
+)
+
+
+# ------ Main entry point ------
+
 def inspect_frame(
     frame: np.ndarray,
     reference: np.ndarray,
@@ -175,10 +211,12 @@ def inspect_frame(
 ) -> InspectionResult:
     """Compare a captured frame against the golden reference.
 
-    Detection uses the **local SSIM map**: the image is scanned in
-    overlapping blocks and the *worst* block determines whether a defect
-    exists.  This catches small localised defects (e.g. a single missing
-    letter) that a global average would miss entirely.
+    1. Template matching locates the label in the frame regardless
+       of where it has drifted.
+    2. The frame is warped to align with the reference.
+    3. Border regions affected by the warp are masked out.
+    4. Local block SSIM detects spatial defects; per-channel global
+       SSIM detects colour-plane defects.
     """
     if frame.shape[:2] != reference.shape[:2]:
         frame = cv2.resize(frame, (reference.shape[1], reference.shape[0]))
@@ -186,19 +224,40 @@ def inspect_frame(
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
 
-    # Align frame to reference to compensate for camera drift
-    gray_frame, dx, dy = align_frame(gray_frame, gray_ref)
-    if dx != 0.0 or dy != 0.0:
-        logger.debug("Aligned frame: shift=(%.1f, %.1f)", dx, dy)
+    # --- Align frame to reference via template matching ---
+    gray_frame, dx, dy, confidence = align_frame(
+        gray_frame, gray_ref, max_shift=config.alignment_max_shift,
+    )
+
+    if confidence < 0.3:
+        logger.info(
+            "Template match confidence %.2f too low — label may not be in frame, skipping",
+            confidence,
+        )
+        return _SKIP
+
+    if dx != 0 or dy != 0:
+        logger.debug("Aligned frame: shift=(%d, %d), confidence=%.2f", dx, dy, confidence)
+
+    # If the shift is so large that the usable comparison area is less
+    # than half the frame, skip — the label hasn't settled.
+    h, w = gray_frame.shape
+    margin_x = abs(dx) + 2 if dx != 0 else 0
+    margin_y = abs(dy) + 2 if dy != 0 else 0
+    if (w - 2 * margin_x) < w * 0.5 or (h - 2 * margin_y) < h * 0.5:
+        logger.info(
+            "Shift too large (%d, %d) — usable area too small, skipping inspection",
+            dx, dy,
+        )
+        return _SKIP
 
     # --- Grayscale SSIM for local detection (spatial defects) ---
     gray_global, gray_map = ssim(gray_ref, gray_frame, full=True)
 
-    # Mask out border pixels affected by alignment warp (BORDER_REPLICATE
-    # introduces synthetic values that would otherwise cause false positives).
-    if dx != 0.0 or dy != 0.0:
-        mx = int(np.ceil(abs(dx))) + 2
-        my = int(np.ceil(abs(dy))) + 2
+    # Mask out border pixels affected by alignment warp
+    if dx != 0 or dy != 0:
+        mx = abs(dx) + 2
+        my = abs(dy) + 2
         gray_map[:my, :] = 1.0
         gray_map[-my:, :] = 1.0
         gray_map[:, :mx] = 1.0
@@ -214,10 +273,8 @@ def inspect_frame(
         worst_block < local_threshold and bad_pixel_count >= config.ssim_bad_pixel_floor
     )
 
-    # --- Per-channel SSIM for global detection (colour-plane defects like
-    #     misregister, density shift, haze — per-channel catches single-
-    #     colour-plate issues that grayscale averages away) ---
-    if dx != 0.0 or dy != 0.0:
+    # --- Per-channel SSIM for global detection (colour-plane defects) ---
+    if dx != 0 or dy != 0:
         M = np.float32([[1, 0, -dx], [0, 1, -dy]])
         for c in range(3):
             frame[:, :, c] = cv2.warpAffine(
@@ -226,13 +283,11 @@ def inspect_frame(
                 borderMode=cv2.BORDER_REPLICATE,
             )
 
-    # Crop border regions for per-channel SSIM when alignment was applied,
-    # preventing BORDER_REPLICATE artifacts from depressing global scores.
     ref_ch = reference
     frm_ch = frame
-    if dx != 0.0 or dy != 0.0:
-        mx = int(np.ceil(abs(dx))) + 2
-        my = int(np.ceil(abs(dy))) + 2
+    if dx != 0 or dy != 0:
+        mx = abs(dx) + 2
+        my = abs(dy) + 2
         ref_ch = reference[my:-my, mx:-mx]
         frm_ch = frame[my:-my, mx:-mx]
 
@@ -259,8 +314,10 @@ def inspect_frame(
         else:
             ai_verdict = AIVerdict.review
         logger.info(
-            "Defect detected: worst_block=%.3f at %s, bad_px=%d, type=%s, severity=%s",
-            worst_block, worst_pos, bad_pixel_count, defect_type, severity.value,
+            "Defect detected: worst_block=%.3f at %s, bad_px=%d, global=%.3f, "
+            "shift=(%d,%d), conf=%.2f, type=%s, severity=%s",
+            worst_block, worst_pos, bad_pixel_count, global_score,
+            dx, dy, confidence, defect_type, severity.value,
         )
     else:
         severity = None

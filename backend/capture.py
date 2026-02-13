@@ -54,6 +54,7 @@ class CaptureManager:
 
         # Camera availability flag
         self._camera_available = False
+        self._using_video_file = False
 
     # ------ Frame preprocessing ------
 
@@ -98,6 +99,20 @@ class CaptureManager:
 
     def _open_camera(self) -> bool:
         try:
+            if self.config.video_file:
+                self._cap = cv2.VideoCapture(self.config.video_file)
+                if not self._cap.isOpened():
+                    logger.warning(
+                        "Video file %s not found. Running in no-camera mode.",
+                        self.config.video_file,
+                    )
+                    self._camera_available = False
+                    return False
+                self._camera_available = True
+                self._using_video_file = True
+                logger.info("Video file opened: %s", self.config.video_file)
+                return True
+
             self._cap = cv2.VideoCapture(self.config.camera_index)
             if not self._cap.isOpened():
                 logger.warning(
@@ -143,7 +158,11 @@ class CaptureManager:
             if camera_ok and self._cap and self._cap.isOpened():
                 ret, raw = self._cap.read()
                 if not ret:
-                    raw = self._generate_placeholder_frame()
+                    if self._using_video_file:
+                        self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, raw = self._cap.read()
+                    if not ret:
+                        raw = self._generate_placeholder_frame()
             else:
                 raw = self._generate_placeholder_frame()
 
@@ -283,6 +302,7 @@ class CaptureManager:
                 "defectsFound": self._db.get_defect_count(),
                 "runTime": run_time,
                 "status": self._inspection_state.value,
+                "hasReference": self._reference_image is not None,
             }
 
     def get_defects(self, offset: int = 0, limit: int = 50) -> list:

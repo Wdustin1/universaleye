@@ -12,11 +12,12 @@ import {
 import { Button } from "@/components/ui/button"
 import { API } from "@/lib/api"
 
-export function LiveFeedPanel({ hasReference = true }: { hasReference?: boolean }) {
+export function LiveFeedPanel({ hasReference = true, onReferenceSet }: { hasReference?: boolean; onReferenceSet?: () => void }) {
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
   const [defectCount, setDefectCount] = useState(0)
   const [timestamp, setTimestamp] = useState("--:--:--")
+  const [captureReady, setCaptureReady] = useState(false)
 
   // Poll stats for defect count and update timestamp
   useEffect(() => {
@@ -137,7 +138,7 @@ export function LiveFeedPanel({ hasReference = true }: { hasReference?: boolean 
           <span className="text-[10px] font-mono text-muted-foreground">{timestamp}</span>
         </div>
         {/* Onboarding overlay — no golden reference set */}
-        {!hasReference && (
+        {!hasReference && !captureReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-10">
             <div className="flex flex-col items-center gap-4 max-w-xs text-center">
               <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -151,15 +152,41 @@ export function LiveFeedPanel({ hasReference = true }: { hasReference?: boolean 
               </div>
               <button
                 type="button"
-                onClick={async () => {
-                  try { await fetch(API.setReference, { method: "POST" }) } catch { /* */ }
-                }}
+                onClick={() => setCaptureReady(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
               >
                 <Camera className="w-4 h-4" />
-                Capture Reference
+                Set Reference
               </button>
             </div>
+          </div>
+        )}
+        {/* Capture button — overlay cleared, waiting for operator to grab the frame */}
+        {!hasReference && captureReady && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await fetch(API.setReference, { method: "POST" })
+                  if (res.ok) {
+                    setCaptureReady(false)
+                    onReferenceSet?.()
+                  }
+                } catch { /* */ }
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30"
+            >
+              <Camera className="w-4 h-4" />
+              Capture
+            </button>
+            <button
+              type="button"
+              onClick={() => setCaptureReady(false)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         )}
       </div>

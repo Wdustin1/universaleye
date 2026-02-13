@@ -5,6 +5,9 @@ scales the SSIM defect threshold linearly between SSIM_THRESHOLD_LOW
 and SSIM_THRESHOLD_HIGH.
 """
 
+from __future__ import annotations
+
+import os
 from dataclasses import dataclass, field
 
 
@@ -15,11 +18,15 @@ class InspectionConfig:
     camera_width: int = 1920
     camera_height: int = 1080
     capture_fps: int = 30
+    video_file: str | None = None  # Path to a video file to use instead of camera (loops)
 
     # Motion detection (state machine)
     motion_threshold: float = 0.02  # 2% of pixels changed = motion
     pixel_diff_threshold: int = 25
-    stability_frames: int = 5
+    stability_frames: int = 8  # require more stable frames before inspecting
+
+    # Alignment — phase correlation to compensate label drift
+    alignment_max_shift: int = 200  # px; labels can drift significantly on the web
 
     # SSIM defect detection — local map approach
     # The SSIM diff map is scanned in blocks; the *worst* block determines
@@ -84,4 +91,6 @@ class InspectionConfig:
         )
 
 
-config = InspectionConfig()
+config = InspectionConfig(
+    video_file=os.environ.get("VIDEO_FILE"),
+)
