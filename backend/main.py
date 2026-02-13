@@ -18,6 +18,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from capture import CaptureManager
 from config import config
+from database import DefectDatabase
 from models import SensitivityRequest
 
 logging.basicConfig(
@@ -27,16 +28,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 capture_manager: CaptureManager | None = None
+defect_db: DefectDatabase | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global capture_manager
-    capture_manager = CaptureManager(config)
+    global capture_manager, defect_db
+    defect_db = DefectDatabase()
+    capture_manager = CaptureManager(config, defect_db)
     capture_manager.start_capture()
     logger.info("Application started")
     yield
     capture_manager.stop_capture()
+    defect_db.close()
     logger.info("Application shutdown")
 
 
@@ -112,6 +116,14 @@ async def defects(
     limit: int = Query(50, ge=1, le=200),
 ):
     return capture_manager.get_defects(offset=offset, limit=limit)
+
+
+@app.get("/api/defects/{defect_id}/image")
+async def defect_image(defect_id: int):
+    path = capture_manager.get_defect_image_path(defect_id)
+    if path is None or not path.exists():
+        return Response(status_code=404)
+    return Response(content=path.read_bytes(), media_type="image/jpeg")
 
 
 @app.get("/api/defect_breakdown")

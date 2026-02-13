@@ -10,15 +10,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { API } from "@/lib/api"
+import { DefectDetail } from "./defect-detail"
 
 interface Defect {
   id: number
   timestamp: string
   type: string
   severity: "critical" | "major" | "minor"
-  labelNumber: number
-  lane: number
   aiVerdict: "reject" | "accept" | "review"
+  ssimScore: number | null
 }
 
 const DEFECT_TYPES = [
@@ -32,6 +32,15 @@ const DEFECT_TYPES = [
   "Web Crease",
 ]
 
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleTimeString("en-GB")
+  } catch {
+    return iso
+  }
+}
+
 export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [defects, setDefects] = useState<Defect[]>([])
   const [selectedDefect, setSelectedDefect] = useState<number | null>(null)
@@ -40,6 +49,11 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
   const filteredDefects = useMemo(
     () => filterType === "All" ? defects : defects.filter((d) => d.type === filterType),
     [defects, filterType]
+  )
+
+  const selectedDefectData = useMemo(
+    () => defects.find((d) => d.id === selectedDefect) ?? null,
+    [defects, selectedDefect]
   )
 
   // Fetch defects when panel opens, poll every 3s
@@ -51,16 +65,13 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
         if (res.ok) {
           const data = await res.json()
           setDefects(data)
-          if (data.length > 0 && selectedDefect === null) {
-            setSelectedDefect(data[0].id)
-          }
         }
       } catch { /* backend not available */ }
     }
     fetchDefects()
     const interval = setInterval(fetchDefects, 3000)
     return () => clearInterval(interval)
-  }, [open, selectedDefect])
+  }, [open])
 
   // SSE for real-time defect notifications
   useEffect(() => {
@@ -77,15 +88,15 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
     return () => source.close()
   }, [])
 
-  // Escape key to close
+  // Escape key to close (only when detail modal is not open)
   useEffect(() => {
-    if (!open) return
+    if (!open || selectedDefect !== null) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false)
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [open, onOpenChange])
+  }, [open, onOpenChange, selectedDefect])
 
   return (
     <>
@@ -160,13 +171,13 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
                       : "hover:bg-secondary border-l-2 border-l-transparent pl-2.5"
                   }`}
                 >
-                  <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background flex items-center justify-center">
-                    <span className={`text-[9px] font-mono font-bold ${
-                      defect.severity === "critical" ? "text-destructive" :
-                      defect.severity === "major" ? "text-warning" : "text-muted-foreground"
-                    }`}>
-                      #{defect.id}
-                    </span>
+                  <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background">
+                    <img
+                      src={API.defectImage(defect.id)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -196,9 +207,8 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-muted-foreground">{defect.type}</span>
-                      <span className="text-[10px] text-muted-foreground">L{defect.lane}</span>
                       <span className="text-[10px] font-mono text-muted-foreground ml-auto">
-                        {defect.timestamp}
+                        {formatTime(defect.timestamp)}
                       </span>
                     </div>
                   </div>
@@ -214,6 +224,14 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
           </div>
         </div>
       </div>
+
+      {/* Detail modal */}
+      {selectedDefectData && (
+        <DefectDetail
+          defect={selectedDefectData}
+          onClose={() => setSelectedDefect(null)}
+        />
+      )}
     </>
   )
 }

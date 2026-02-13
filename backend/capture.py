@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 
 from config import InspectionConfig
+from database import DefectDatabase
 from inspector import inspect_frame
 from models import Defect, InspectionState
 from state_machine import MotionStateMachine, State
@@ -26,8 +27,9 @@ logger = logging.getLogger(__name__)
 class CaptureManager:
     """Manages video capture, state machine, and inspection in a background thread."""
 
-    def __init__(self, config: InspectionConfig) -> None:
+    def __init__(self, config: InspectionConfig, db: DefectDatabase) -> None:
         self.config = config
+        self._db = db
         self._lock = threading.Lock()
         self._running = False
         self._thread: threading.Thread | None = None
@@ -42,8 +44,6 @@ class CaptureManager:
 
         # Stats
         self._labels_inspected: int = 0
-        self._defects: list[Defect] = []
-        self._defect_id_counter: int = 0
         self._start_time: datetime | None = None
 
         # State machine (only accessed from capture thread)
@@ -54,6 +54,27 @@ class CaptureManager:
 
         # Camera availability flag
         self._camera_available = False
+
+    # ------ Frame preprocessing ------
+
+    def _crop_frame(self, frame: np.ndarray) -> np.ndarray:
+        """Remove ELSCAN OMS3 UI overlay and mask ROI marker lines."""
+        cfg = self.config
+
+        # Interpolate over thin vertical ROI marker lines
+        for x1, x2 in cfg.crop_mask_lines:
+            if x1 > 1 and x2 < frame.shape[1] - 2:
+                left = frame[:, x1 - 2 : x1, :].mean(axis=1, keepdims=True)
+                right = frame[:, x2 + 1 : x2 + 3, :].mean(axis=1, keepdims=True)
+                span = x2 - x1 + 1
+                for i, x in enumerate(range(x1, x2 + 1)):
+                    t = i / max(span - 1, 1)
+                    frame[:, x, :] = ((1 - t) * left + t * right).squeeze().astype(
+                        np.uint8
+                    )
+
+        # Crop to label area
+        return frame[cfg.crop_top : cfg.crop_bottom, cfg.crop_left : cfg.crop_right]
 
     # ------ Thread lifecycle ------
 
@@ -96,6 +117,7 @@ class CaptureManager:
             return False
 
     def _generate_placeholder_frame(self) -> np.ndarray:
+        """Generate a full-resolution placeholder (will be cropped by _crop_frame)."""
         frame = np.full(
             (self.config.camera_height, self.config.camera_width, 3),
             20,
@@ -119,11 +141,13 @@ class CaptureManager:
             loop_start = time.monotonic()
 
             if camera_ok and self._cap and self._cap.isOpened():
-                ret, frame = self._cap.read()
+                ret, raw = self._cap.read()
                 if not ret:
-                    frame = self._generate_placeholder_frame()
+                    raw = self._generate_placeholder_frame()
             else:
-                frame = self._generate_placeholder_frame()
+                raw = self._generate_placeholder_frame()
+
+            frame = self._crop_frame(raw)
 
             with self._lock:
                 self._latest_frame = frame
@@ -153,18 +177,24 @@ class CaptureManager:
         )
 
         if result.is_defect:
-            self._defect_id_counter += 1
             now = datetime.now()
+            defect_id = self._db.insert_defect(
+                timestamp=now.isoformat(timespec="seconds"),
+                defect_type=result.defect_type,
+                severity=result.severity.value,
+                ai_verdict=result.ai_verdict.value,
+                ssim_score=result.ssim_score,
+                frame=locked_frame,
+                diff_image=result.diff_image,
+            )
             defect = Defect(
-                id=self._defect_id_counter,
-                timestamp=now.strftime("%H:%M:%S"),
+                id=defect_id,
+                timestamp=now.isoformat(timespec="seconds"),
                 type=result.defect_type,
                 severity=result.severity,
-                label_number=self._labels_inspected,
-                lane=((self._labels_inspected - 1) % 3) + 1,
                 ai_verdict=result.ai_verdict,
+                ssim_score=result.ssim_score,
             )
-            self._defects.insert(0, defect)
 
             for callback in self._event_callbacks:
                 try:
@@ -230,11 +260,10 @@ class CaptureManager:
             self._inspection_state = InspectionState.stopped
             self._state_machine.reset()
             self._labels_inspected = 0
-            self._defects.clear()
-            self._defect_id_counter = 0
             self._start_time = None
             self._last_inspected_frame = None
-            logger.info("Inspection stopped, stats reset")
+        self._db.clear_all()
+        logger.info("Inspection stopped, stats reset")
 
     def set_sensitivity(self, value: int) -> None:
         with self._lock:
@@ -251,34 +280,19 @@ class CaptureManager:
 
             return {
                 "labelsInspected": self._labels_inspected,
-                "defectsFound": len(self._defects),
+                "defectsFound": self._db.get_defect_count(),
                 "runTime": run_time,
                 "status": self._inspection_state.value,
             }
 
-    def get_defects(self, offset: int = 0, limit: int = 50) -> list[dict]:
-        with self._lock:
-            sliced = self._defects[offset : offset + limit]
-            return [d.model_dump_frontend() for d in sliced]
+    def get_defects(self, offset: int = 0, limit: int = 50) -> list:
+        return self._db.get_defects(offset, limit)
 
-    def get_defect_breakdown(self) -> list[dict]:
-        with self._lock:
-            total = len(self._defects)
-            if total == 0:
-                return []
-            counts: dict[str, int] = {}
-            for d in self._defects:
-                counts[d.type] = counts.get(d.type, 0) + 1
-            return [
-                {
-                    "type": dtype,
-                    "count": count,
-                    "percentage": round(count / total * 100, 1),
-                }
-                for dtype, count in sorted(
-                    counts.items(), key=lambda x: x[1], reverse=True
-                )
-            ]
+    def get_defect_breakdown(self) -> list:
+        return self._db.get_defect_breakdown()
+
+    def get_defect_image_path(self, defect_id: int):
+        return self._db.get_defect_image_path(defect_id)
 
     def register_event_callback(self, callback) -> None:
         self._event_callbacks.append(callback)

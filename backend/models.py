@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -26,15 +27,14 @@ class InspectionState(str, Enum):
 
 
 class Defect(BaseModel):
-    """Matches the frontend Defect interface exactly."""
+    """Matches the frontend Defect interface."""
 
     id: int
-    timestamp: str
+    timestamp: str  # ISO 8601: "2026-02-12T14:32:07"
     type: str
     severity: Severity
-    label_number: int
-    lane: int
     ai_verdict: AIVerdict
+    ssim_score: Optional[float] = None
 
     def model_dump_frontend(self) -> dict:
         """Return dict with camelCase keys matching TypeScript interface."""
@@ -43,9 +43,8 @@ class Defect(BaseModel):
             "timestamp": self.timestamp,
             "type": self.type,
             "severity": self.severity.value,
-            "labelNumber": self.label_number,
-            "lane": self.lane,
             "aiVerdict": self.ai_verdict.value,
+            "ssimScore": self.ssim_score,
         }
 
 

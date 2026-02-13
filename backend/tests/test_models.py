@@ -7,18 +7,18 @@ class TestDefect:
     def test_model_dump_frontend_keys(self) -> None:
         d = Defect(
             id=1,
-            timestamp="14:32:07",
+            timestamp="2026-02-12T14:32:07",
             type="Smudge",
             severity=Severity.major,
-            label_number=12847,
-            lane=3,
             ai_verdict=AIVerdict.reject,
+            ssim_score=0.72,
         )
         result = d.model_dump_frontend()
-        assert result["labelNumber"] == 12847
         assert result["aiVerdict"] == "reject"
-        assert "label_number" not in result
+        assert result["ssimScore"] == 0.72
         assert "ai_verdict" not in result
+        assert "labelNumber" not in result
+        assert "lane" not in result
 
 
 class TestStatsResponse:

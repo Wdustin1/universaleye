@@ -102,3 +102,8 @@ class TestDefectsEndpoint:
         resp = client.get("/api/defect_breakdown")
         assert resp.status_code == 200
         assert resp.json() == []
+
+    def test_defect_image_404_when_missing(self, test_app) -> None:
+        client, _ = test_app
+        resp = client.get("/api/defects/999/image")
+        assert resp.status_code == 404

@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import InspectionConfig
+from database import DefectDatabase
 
 
 @pytest.fixture
@@ -18,10 +19,26 @@ def test_config() -> InspectionConfig:
         motion_threshold=0.01,
         pixel_diff_threshold=10,
         stability_frames=3,
-        ssim_threshold_low=0.70,
-        ssim_threshold_high=0.95,
+        ssim_block_size=32,
+        ssim_block_stride=16,
+        ssim_local_threshold_low=0.80,
+        ssim_local_threshold_high=0.95,
+        ssim_global_threshold_low=0.90,
+        ssim_global_threshold_high=0.97,
+        ssim_bad_pixel_floor=20,
         default_sensitivity=75,
     )
+
+
+@pytest.fixture
+def test_db(tmp_path) -> DefectDatabase:
+    """Fresh SQLite database in a temp directory."""
+    db = DefectDatabase(
+        db_path=tmp_path / "test.db",
+        image_dir=tmp_path / "images",
+    )
+    yield db
+    db.close()
 
 
 @pytest.fixture
