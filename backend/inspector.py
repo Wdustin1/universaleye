@@ -2,7 +2,7 @@
 
 Compares a captured frame against a golden reference image using
 Structural Similarity Index (SSIM).  Before comparison, the frame
-is aligned to the reference via template matching so that label
+is aligned to the reference via ORB feature matching so that label
 drift on the web doesn't trigger false defects.
 """
 
