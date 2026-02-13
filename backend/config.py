@@ -25,8 +25,11 @@ class InspectionConfig:
     pixel_diff_threshold: int = 25
     stability_frames: int = 8  # require more stable frames before inspecting
 
-    # Alignment — phase correlation to compensate label drift
-    alignment_max_shift: int = 200  # px; labels can drift significantly on the web
+    # ORB feature matching alignment
+    orb_features: int = 500         # max ORB keypoints to detect
+    orb_min_matches: int = 10       # minimum good matches for homography
+    # State machine motion blur
+    motion_blur_kernel: int = 5     # Gaussian blur kernel for jitter suppression
 
     # SSIM defect detection — local map approach
     # The SSIM diff map is scanned in blocks; the *worst* block determines

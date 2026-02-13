@@ -39,3 +39,10 @@ class TestInspectionConfig:
     def test_global_threshold_at_max(self) -> None:
         cfg = InspectionConfig()
         assert cfg.ssim_global_threshold_for_sensitivity(100) == cfg.ssim_global_threshold_high
+
+    def test_orb_config_defaults(self) -> None:
+        cfg = InspectionConfig()
+        assert cfg.orb_features == 500
+        assert cfg.orb_min_matches == 10
+        assert cfg.motion_blur_kernel == 5
+        assert not hasattr(cfg, 'alignment_max_shift')
