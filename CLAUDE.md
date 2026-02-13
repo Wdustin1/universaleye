@@ -74,7 +74,7 @@ All frontend components poll the Python backend at `localhost:8000` (configurabl
 
 - **CaptureManager** (`backend/capture.py`) — central coordinator, runs a background daemon thread for OpenCV VideoCapture (blocking C calls can't use asyncio)
 - **State Machine** (`backend/state_machine.py`) — MONITORING → MOTION → STABILIZING → INSPECT cycle; only inspects when labels stop moving
-- **Inspector** (`backend/inspector.py`) — SSIM comparison against golden reference, defect type classification via contour analysis
+- **Inspector** (`backend/inspector.py`) — ORB feature matching alignment + SSIM comparison against golden reference, defect type classification via contour analysis
 - **Database** (`backend/database.py`) — SQLite persistence for defect records + annotated JPEG storage in `backend/data/`
 - **Config** (`backend/config.py`) — all tunable thresholds (camera, motion, SSIM, sensitivity)
 - **Models** (`backend/models.py`) — Pydantic models with `model_dump_frontend()` for camelCase serialization
@@ -123,7 +123,7 @@ backend/
 1. **Video Capture** — threaded OpenCV loop at 30 FPS (`CaptureManager`)
 2. **Frame Preprocessing** — crop ELSCAN UI overlay, mask ROI marker lines
 3. **Motion Detection** — state machine detects label arrival and stabilization
-4. **Alignment** — phase correlation corrects camera drift (integer-pixel, up to 50px)
+4. **Alignment** — ORB feature matching + homography corrects camera jitter (handles translation, rotation, scale)
 5. **SSIM Inspection** — dual detection: local block scan (spatial defects) + per-channel global (color-plane defects)
 6. **Defect Classification** — determines type (8 categories) via contour analysis, severity via worst-block SSIM score
 7. **Persistence** — defect metadata to SQLite, annotated JPEG (red highlight overlay) to disk
