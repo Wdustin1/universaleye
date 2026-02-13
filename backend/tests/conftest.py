@@ -68,8 +68,8 @@ def noisy_frame(blank_frame: np.ndarray) -> np.ndarray:
 def reference_label() -> np.ndarray:
     """Synthetic 'golden master' label image (400x200 BGR).
 
-    Large enough for template matching to work reliably.
-    Contains text-like dark bars and colour blocks.
+    Large enough for ORB feature matching to work reliably.
+    Contains text-like dark bars, colour blocks, and corner features.
     """
     img = np.full((200, 400, 3), 200, dtype=np.uint8)
     # Text-like dark bars
@@ -81,6 +81,19 @@ def reference_label() -> np.ndarray:
     img[160:190, 260:340] = [50, 50, 180]
     # Some detail in the top area
     img[20:30, 80:320] = 120
+    # Add corner features for ORB (small squares well away from edges to handle shifts)
+    img[25:30, 85:90] = 40
+    img[25:30, 165:170] = 40
+    img[25:30, 245:250] = 40
+    img[25:30, 325:330] = 40
+    img[130:135, 85:90] = 40
+    img[130:135, 165:170] = 40
+    img[130:135, 245:250] = 40
+    img[130:135, 325:330] = 40
+    img[55:60, 85:90] = 130
+    img[55:60, 165:170] = 130
+    img[55:60, 245:250] = 130
+    img[55:60, 325:330] = 130
     return img
 
 

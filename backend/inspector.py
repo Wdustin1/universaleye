@@ -31,75 +31,66 @@ DEFECT_TYPES = [
 ]
 
 
-# ------ Alignment via template matching ------
-
-def locate_label(
-    frame_gray: np.ndarray,
-    ref_gray: np.ndarray,
-    margin_pct: float = 0.15,
-) -> tuple[int, int, float]:
-    """Find the label offset using template matching.
-
-    Crops the central portion of the reference (avoiding edges that
-    may be background) and searches for it in the current frame.
-    Much more robust than phase correlation for large shifts — finds
-    the label wherever it is in the frame.
-
-    Returns (dx, dy, confidence) where dx/dy is how much the frame
-    content is shifted relative to the reference, and confidence is
-    the normalised correlation score (0–1).
-    """
-    h, w = ref_gray.shape
-    my = int(h * margin_pct)
-    mx = int(w * margin_pct)
-    template = ref_gray[my : h - my, mx : w - mx]
-
-    result = cv2.matchTemplate(frame_gray, template, cv2.TM_CCOEFF_NORMED)
-    _, confidence, _, max_loc = cv2.minMaxLoc(result)
-
-    # max_loc is where the template top-left was found in the frame.
-    # The template was cut from (mx, my) in the reference, so the
-    # offset of the frame relative to the reference is:
-    dx = max_loc[0] - mx
-    dy = max_loc[1] - my
-
-    return dx, dy, float(confidence)
-
+# ------ Alignment via ORB feature matching ------
 
 def align_frame(
     frame_gray: np.ndarray,
     ref_gray: np.ndarray,
-    max_shift: int = 200,
-    min_confidence: float = 0.3,
-) -> tuple[np.ndarray, int, int, float]:
-    """Align *frame_gray* to *ref_gray* using template matching.
+    orb_features: int = 500,
+    min_matches: int = 10,
+) -> tuple[np.ndarray, np.ndarray | None, float]:
+    """Align *frame_gray* to *ref_gray* using ORB feature matching + homography.
 
-    Returns (aligned_frame, dx, dy, confidence).  If the match
-    confidence is too low or the shift exceeds *max_shift*, the
-    frame is returned unchanged.
+    Returns (aligned_frame, homography_matrix, confidence).
+    - confidence is the ratio of RANSAC inliers to total matches (0-1).
+    - If not enough matches, returns (frame_gray, None, 0.0).
     """
-    dx, dy, confidence = locate_label(frame_gray, ref_gray)
+    orb = cv2.ORB_create(nfeatures=orb_features)
+    kp1, des1 = orb.detectAndCompute(ref_gray, None)
+    kp2, des2 = orb.detectAndCompute(frame_gray, None)
 
-    if confidence < min_confidence:
-        logger.debug(
-            "Template match confidence %.2f below threshold %.2f; skipping alignment",
-            confidence, min_confidence,
-        )
-        return frame_gray, 0, 0, confidence
+    if des1 is None or des2 is None or len(des1) < min_matches or len(des2) < min_matches:
+        logger.debug("Not enough ORB features: ref=%s, frame=%s",
+                      len(des1) if des1 is not None else 0,
+                      len(des2) if des2 is not None else 0)
+        return frame_gray, None, 0.0
 
-    if abs(dx) > max_shift or abs(dy) > max_shift:
-        logger.debug("Shift (%d, %d) exceeds max_shift %d", dx, dy, max_shift)
-        return frame_gray, 0, 0, confidence
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+    raw_matches = bf.knnMatch(des1, des2, k=2)
 
-    if dx == 0 and dy == 0:
-        return frame_gray, 0, 0, confidence
+    # Lowe's ratio test
+    good = []
+    for m_pair in raw_matches:
+        if len(m_pair) == 2:
+            m, n = m_pair
+            if m.distance < 0.75 * n.distance:
+                good.append(m)
 
-    M = np.float32([[1, 0, -dx], [0, 1, -dy]])
-    aligned = cv2.warpAffine(
-        frame_gray, M, (frame_gray.shape[1], frame_gray.shape[0]),
-        borderMode=cv2.BORDER_REPLICATE,
-    )
-    return aligned, dx, dy, confidence
+    if len(good) < min_matches:
+        logger.debug("Only %d good matches (need %d)", len(good), min_matches)
+        return frame_gray, None, 0.0
+
+    src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+
+    H, mask = cv2.findHomography(dst_pts, src_pts, cv2.RANSAC, 5.0)
+
+    if H is None:
+        logger.debug("Homography computation failed")
+        return frame_gray, None, 0.0
+
+    inliers = int(mask.sum()) if mask is not None else 0
+    confidence = inliers / len(good) if good else 0.0
+
+    if confidence < 0.3:
+        logger.debug("Homography confidence %.2f too low", confidence)
+        return frame_gray, None, confidence
+
+    h, w = ref_gray.shape
+    aligned = cv2.warpPerspective(frame_gray, H, (w, h),
+                                  borderMode=cv2.BORDER_REPLICATE)
+
+    return aligned, H, confidence
 
 
 # ------ Inspection helpers ------
@@ -211,11 +202,9 @@ def inspect_frame(
 ) -> InspectionResult:
     """Compare a captured frame against the golden reference.
 
-    1. Template matching locates the label in the frame regardless
-       of where it has drifted.
-    2. The frame is warped to align with the reference.
-    3. Border regions affected by the warp are masked out.
-    4. Local block SSIM detects spatial defects; per-channel global
+    1. ORB feature matching aligns the frame to the reference.
+    2. A validity mask excludes border pixels affected by the warp.
+    3. Local block SSIM detects spatial defects; per-channel global
        SSIM detects colour-plane defects.
     """
     if frame.shape[:2] != reference.shape[:2]:
@@ -224,49 +213,42 @@ def inspect_frame(
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray_ref = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
 
-    # --- Align frame to reference via template matching ---
-    gray_frame, dx, dy, confidence = align_frame(
-        gray_frame, gray_ref, max_shift=config.alignment_max_shift,
+    # --- Align frame to reference via ORB ---
+    gray_frame, H, confidence = align_frame(
+        gray_frame, gray_ref,
+        orb_features=config.orb_features,
+        min_matches=config.orb_min_matches,
     )
 
-    if confidence < 0.3:
+    if H is None:
         logger.info(
-            "Template match confidence %.2f too low — label may not be in frame, skipping",
+            "ORB alignment failed (confidence=%.2f) — skipping inspection",
             confidence,
         )
         return _SKIP
 
-    if dx != 0 or dy != 0:
-        logger.debug("Aligned frame: shift=(%d, %d), confidence=%.2f", dx, dy, confidence)
+    logger.debug("ORB aligned frame: confidence=%.2f", confidence)
 
-    # If the shift is so large that the usable comparison area is less
-    # than half the frame, skip — the label hasn't settled.
-    h, w = gray_frame.shape
-    margin_x = abs(dx) + 2 if dx != 0 else 0
-    margin_y = abs(dy) + 2 if dy != 0 else 0
-    if (w - 2 * margin_x) < w * 0.5 or (h - 2 * margin_y) < h * 0.5:
-        logger.info(
-            "Shift too large (%d, %d) — usable area too small, skipping inspection",
-            dx, dy,
-        )
+    # Build validity mask — warp a white image to find valid pixels
+    h, w = gray_ref.shape
+    ones = np.ones((h, w), dtype=np.uint8) * 255
+    valid_mask = cv2.warpPerspective(ones, H, (w, h)) > 128
+    valid_ratio = valid_mask.sum() / valid_mask.size
+
+    if valid_ratio < 0.5:
+        logger.info("Valid area ratio %.2f too small — skipping inspection", valid_ratio)
         return _SKIP
 
     # --- Grayscale SSIM for local detection (spatial defects) ---
     gray_global, gray_map = ssim(gray_ref, gray_frame, full=True)
 
-    # Mask out border pixels affected by alignment warp
-    if dx != 0 or dy != 0:
-        mx = abs(dx) + 2
-        my = abs(dy) + 2
-        gray_map[:my, :] = 1.0
-        gray_map[-my:, :] = 1.0
-        gray_map[:, :mx] = 1.0
-        gray_map[:, -mx:] = 1.0
+    # Mask out invalid border pixels from alignment warp
+    gray_map[~valid_mask] = 1.0
 
     worst_block, worst_pos = find_worst_block(
         gray_map, config.ssim_block_size, config.ssim_block_stride,
     )
-    bad_pixel_count = int(np.sum(gray_map < 0.5))
+    bad_pixel_count = int(np.sum(gray_map[valid_mask] < 0.5))
 
     local_threshold = config.ssim_local_threshold_for_sensitivity(sensitivity)
     local_defect = (
@@ -274,26 +256,26 @@ def inspect_frame(
     )
 
     # --- Per-channel SSIM for global detection (colour-plane defects) ---
-    if dx != 0 or dy != 0:
-        M = np.float32([[1, 0, -dx], [0, 1, -dy]])
-        for c in range(3):
-            frame[:, :, c] = cv2.warpAffine(
-                frame[:, :, c], M,
-                (frame.shape[1], frame.shape[0]),
-                borderMode=cv2.BORDER_REPLICATE,
-            )
+    aligned_color = frame.copy()
+    for c in range(3):
+        aligned_color[:, :, c] = cv2.warpPerspective(
+            frame[:, :, c], H, (w, h),
+            borderMode=cv2.BORDER_REPLICATE,
+        )
 
-    ref_ch = reference
-    frm_ch = frame
-    if dx != 0 or dy != 0:
-        mx = abs(dx) + 2
-        my = abs(dy) + 2
-        ref_ch = reference[my:-my, mx:-mx]
-        frm_ch = frame[my:-my, mx:-mx]
+    # Crop to valid region for channel comparison
+    ys, xs = np.where(valid_mask)
+    if len(ys) == 0:
+        return _SKIP
+    y1, y2 = ys.min(), ys.max() + 1
+    x1, x2 = xs.min(), xs.max() + 1
+
+    ref_crop = reference[y1:y2, x1:x2]
+    frm_crop = aligned_color[y1:y2, x1:x2]
 
     channel_scores = []
     for c in range(3):
-        ch_score, _ = ssim(ref_ch[:, :, c], frm_ch[:, :, c], full=True)
+        ch_score, _ = ssim(ref_crop[:, :, c], frm_crop[:, :, c], full=True)
         channel_scores.append(ch_score)
 
     global_score = float(min(channel_scores))
@@ -315,9 +297,9 @@ def inspect_frame(
             ai_verdict = AIVerdict.review
         logger.info(
             "Defect detected: worst_block=%.3f at %s, bad_px=%d, global=%.3f, "
-            "shift=(%d,%d), conf=%.2f, type=%s, severity=%s",
+            "conf=%.2f, type=%s, severity=%s",
             worst_block, worst_pos, bad_pixel_count, global_score,
-            dx, dy, confidence, defect_type, severity.value,
+            confidence, defect_type, severity.value,
         )
     else:
         severity = None
