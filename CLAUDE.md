@@ -6,26 +6,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Universal Eye is an AI-powered web inspection and defect detection system for monitoring product labels on automated flexographic production lines. It consists of a **Next.js frontend dashboard** and a **Python/FastAPI backend** that captures video from a USB HDMI capture card, detects label motion/stability, and compares stable frames against a golden reference using SSIM.
 
+**Development: MacBook Air M4.** **Production target: NVIDIA Jetson.** Current SSIM-based detection in `inspector.py` is a placeholder — production will use a trained vision model optimized with TensorRT. The threaded capture pipeline, state machine, FastAPI server, and frontend are all designed to carry over. No CUDA/TensorRT tooling is available in the dev environment.
+
 ## Commands
 
+### Frontend (Next.js)
+
 ```bash
-# Frontend (Next.js)
 pnpm dev          # Start dev server (port 3000)
 pnpm build        # Production build
 pnpm start        # Run production server
 pnpm lint         # ESLint (flat config, eslint.config.mjs)
-
-# Backend (Python/FastAPI)
-cd backend && source .venv/bin/activate && python main.py   # Start backend (port 8000)
-cd backend && source .venv/bin/activate && pytest -v         # Run backend tests (51 tests)
 ```
 
-Package manager is **pnpm** (lock file committed). Backend uses **pip** with a venv.
+Package manager is **pnpm** (lock file committed).
+
+### Backend (Python/FastAPI)
+
+```bash
+cd backend
+pip install -r requirements.txt          # Install dependencies
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload   # Start API server
+pytest                                   # Run test suite
+```
+
+Both servers must run simultaneously for full functionality.
 
 ## Build Configuration
 
-- `next.config.mjs` sets `typescript.ignoreBuildErrors: true` — TypeScript errors won't fail the build
-- `images.unoptimized: true` — all images served as-is (no Next.js image optimization)
+- `next.config.mjs` sets `images.unoptimized: true` — all images served as-is (no Next.js image optimization)
 - ESLint uses flat config format (`eslint.config.mjs`) extending `eslint-config-next`
 
 ## Tech Stack
@@ -38,11 +47,12 @@ Package manager is **pnpm** (lock file committed). Backend uses **pip** with a v
 - Fonts: Inter (sans) and JetBrains Mono (mono) via `next/font/google`
 
 ### Backend
-- **Python 3.12+**, **FastAPI**, **uvicorn**
-- **OpenCV** (headless) for video capture and motion detection
+- **Python 3.9+**, **FastAPI**, **uvicorn**
+- **OpenCV** (`opencv-python-headless`) for video capture and motion detection
 - **scikit-image** for SSIM-based defect comparison
+- **NumPy** for image processing
 - **sse-starlette** for Server-Sent Events
-- **numpy** for image processing
+- **pytest** + **pytest-asyncio** + **httpx** for testing
 
 ## Architecture
 
@@ -65,17 +75,69 @@ All frontend components poll the Python backend at `localhost:8000` (configurabl
 - **CaptureManager** (`backend/capture.py`) — central coordinator, runs a background daemon thread for OpenCV VideoCapture (blocking C calls can't use asyncio)
 - **State Machine** (`backend/state_machine.py`) — MONITORING → MOTION → STABILIZING → INSPECT cycle; only inspects when labels stop moving
 - **Inspector** (`backend/inspector.py`) — SSIM comparison against golden reference, defect type classification via contour analysis
+- **Database** (`backend/database.py`) — SQLite persistence for defect records + annotated JPEG storage in `backend/data/`
 - **Config** (`backend/config.py`) — all tunable thresholds (camera, motion, SSIM, sensitivity)
 - **Models** (`backend/models.py`) — Pydantic models with `model_dump_frontend()` for camelCase serialization
-- **Main** (`backend/main.py`) — FastAPI app with 14 routes, MJPEG streaming, SSE events, lifespan management
+- **Main** (`backend/main.py`) — FastAPI app with routes, MJPEG streaming, SSE events, lifespan management
 
 ### Path Aliases
 
 `@/*` maps to the project root (e.g., `@/components/dashboard/header`).
 
-### Layout Structure
+### Backend Structure
 
-Single-page dashboard in `app/page.tsx` (client component). The layout is a fixed viewport (`h-screen`, `overflow-hidden`) with:
+```
+backend/
+├── main.py           # FastAPI app, all API endpoints, MJPEG streaming
+├── models.py         # Pydantic models (Defect, Severity, AIVerdict, InspectionState)
+├── config.py         # InspectionConfig (camera, SSIM thresholds, motion detection)
+├── capture.py        # CaptureManager — threaded video capture + inspection orchestration
+├── inspector.py      # SSIM comparison, defect classification by type/severity
+├── database.py       # SQLite defect persistence + annotated image storage
+├── state_machine.py  # Motion detection state machine (MONITORING→MOTION→STABILIZING→INSPECT)
+└── tests/            # pytest suite (API, capture, config, database, inspector, models, state machine)
+```
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/video_feed` | GET | MJPEG stream (15 FPS, 80% JPEG quality) |
+| `/api/reference_image` | GET | Golden reference image (JPEG), 204 if unset |
+| `/api/current_capture` | GET | Last inspected frame (JPEG), 204 if none |
+| `/api/stats` | GET | Inspection metrics (labelsInspected, defectsFound, runTime, status) |
+| `/api/defects` | GET | Paginated defect list (offset/limit params) |
+| `/api/defects/{id}/image` | GET | Annotated defect image (JPEG with red highlight overlay) |
+| `/api/defect_breakdown` | GET | Defect type distribution with percentages |
+| `/api/inspection/start` | POST | Start/resume inspection |
+| `/api/inspection/pause` | POST | Pause inspection |
+| `/api/inspection/stop` | POST | Stop and reset all stats + clear defect database |
+| `/api/inspection/sensitivity` | PUT | Set detection sensitivity (0–100) |
+| `/api/set_reference` | POST | Capture current frame as golden reference |
+| `/api/reset_reference` | POST | Clear reference image |
+| `/api/events` | GET | SSE endpoint for real-time defect notifications |
+| `/api/health` | GET | Health check with camera availability |
+
+### Inspection Pipeline
+
+1. **Video Capture** — threaded OpenCV loop at 30 FPS (`CaptureManager`)
+2. **Frame Preprocessing** — crop ELSCAN UI overlay, mask ROI marker lines
+3. **Motion Detection** — state machine detects label arrival and stabilization
+4. **Alignment** — phase correlation corrects camera drift (integer-pixel, up to 50px)
+5. **SSIM Inspection** — dual detection: local block scan (spatial defects) + per-channel global (color-plane defects)
+6. **Defect Classification** — determines type (8 categories) via contour analysis, severity via worst-block SSIM score
+7. **Persistence** — defect metadata to SQLite, annotated JPEG (red highlight overlay) to disk
+8. **Notification** — SSE push to frontend
+
+### State Machine Flow
+
+```
+MONITORING → (motion detected) → MOTION → (motion stops) → STABILIZING → (5 stable frames) → INSPECT → (acknowledged) → MONITORING
+```
+
+### Frontend Layout
+
+Single-page dashboard in `app/page.tsx` (client component). Fixed viewport (`h-screen`, `overflow-hidden`):
 
 ```
 +-------------------------------------------------+
@@ -89,6 +151,7 @@ Single-page dashboard in `app/page.tsx` (client component). The layout is a fixe
 |        | DefectBreakdown (h-36)                  |
 +--------+--------------------+--------------------+
           DefectLog -> slide-out panel from right edge
+          DefectDetail -> modal overlay on defect click
 ```
 
 ### Onboarding Flow
@@ -104,13 +167,18 @@ React hooks only (useState/useEffect). `page.tsx` owns top-level polling (stats,
 
 ### Data
 
-Defect types: Smudge, Misregister, Hickey, Color Shift, Scratch, Splash/Spot, Missing Print, Web Crease. Severity levels: critical, major, minor. AI verdicts: reject, accept, review.
+Defect types: Smudge, Misregister, Hickey, Color Shift, Scratch, Splash/Spot, Missing Print, Web Crease. Severity levels: critical, major, minor. AI verdicts: reject, accept, review. Severity classification is based on SSIM score thresholds configured in `backend/config.py`.
 
 ### Theming
 
-Dark-only design using CSS variables in `app/globals.css` (no `:root` light theme defined). Key brand colors: primary teal (`168 75% 42%`), destructive red, success green, warning amber.
+Dark-only design using CSS variables in `app/globals.css` (no light theme). Key brand colors: primary teal (`168 75% 42%`), destructive red, success green, warning amber.
 
 Tailwind colors reference CSS variables via `hsl(var(--name))` pattern (see `tailwind.config.ts`).
+
+## Environment Variables
+
+- `NEXT_PUBLIC_API_URL` — frontend API base URL (default: `http://localhost:8000`)
+- Backend config is in `backend/config.py` (camera index, SSIM thresholds, CORS origins, etc.)
 
 ## Conventions
 
@@ -118,4 +186,5 @@ Tailwind colors reference CSS variables via `hsl(var(--name))` pattern (see `tai
 - Use the `cn()` utility from `@/lib/utils` for conditional class merging (clsx + tailwind-merge)
 - The app uses `"use client"` for interactive components; the root layout (`app/layout.tsx`) is a server component
 - Backend uses `threading.Lock` for shared state between capture thread and API routes
-- Set `NEXT_PUBLIC_API_URL` env var to point frontend at a different backend host
+- Backend CORS is hardcoded for `localhost:3000` — update `config.py` for production
+- Camera fallback: if no camera available, backend generates a placeholder frame (app still works)
