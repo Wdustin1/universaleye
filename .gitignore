@@ -11,6 +11,9 @@ node_modules/
 .env*.local
 .DS_Store
 .vercel
+next-env.d.ts
+tsconfig.tsbuildinfo
+*.mov
 
 # Python backend
 backend/__pycache__/
