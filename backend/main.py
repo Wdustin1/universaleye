@@ -61,7 +61,8 @@ app.add_middleware(
 
 # ------ MJPEG Video Feed ------
 
-def _mjpeg_generator():
+async def _mjpeg_generator():
+    """Async MJPEG generator - doesn't block the event loop."""
     boundary = b"--frame\r\n"
     while True:
         jpeg = capture_manager.get_latest_frame_jpeg()
@@ -74,7 +75,7 @@ def _mjpeg_generator():
                 + jpeg
                 + b"\r\n"
             )
-        time.sleep(1.0 / config.mjpeg_fps)
+        await asyncio.sleep(1.0 / config.mjpeg_fps)
 
 
 @app.get("/video_feed")
@@ -187,7 +188,7 @@ async def events():
         try:
             event_queue.put_nowait(defect)
         except asyncio.QueueFull:
-            pass
+            logger.warning("SSE event queue full - defect event dropped")
 
     capture_manager.register_event_callback(on_defect)
 

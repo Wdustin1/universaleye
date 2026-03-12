@@ -120,33 +120,33 @@ class DefectDatabase:
         diff_image: Optional[np.ndarray],
     ) -> int:
         """Insert a defect row and save the annotated image. Returns the new ID."""
-        # Build annotated image
+        # Build annotated image first (outside DB lock)
         image_path: Optional[str] = None
         annotated: Optional[np.ndarray] = None
         if diff_image is not None:
             annotated = create_annotated_image(frame, diff_image)
 
+        # Single transaction for both insert and image_path update
         with self._lock:
             cur = self._conn.execute(
-                "INSERT INTO defects (timestamp, type, severity, ai_verdict, ssim_score)"
-                " VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO defects (timestamp, type, severity, ai_verdict, ssim_score, image_path)"
+                " VALUES (?, ?, ?, ?, ?, NULL)",
                 (timestamp, defect_type, severity, ai_verdict, ssim_score),
             )
             defect_id = cur.lastrowid
-            self._conn.commit()
 
-        # Save image outside the DB lock
-        if annotated is not None:
-            fname = f"{defect_id}.jpg"
-            fpath = self._image_dir / fname
-            cv2.imwrite(str(fpath), annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            image_path = f"defect_images/{fname}"
-            with self._lock:
+            # Update with image path in same transaction
+            if annotated is not None:
+                fname = f"{defect_id}.jpg"
+                fpath = self._image_dir / fname
+                cv2.imwrite(str(fpath), annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                image_path = f"defect_images/{fname}"
                 self._conn.execute(
                     "UPDATE defects SET image_path = ? WHERE id = ?",
                     (image_path, defect_id),
                 )
-                self._conn.commit()
+
+            self._conn.commit()
 
         return defect_id
 
@@ -212,19 +212,21 @@ class DefectDatabase:
 
     def insert_collected_frame(self, timestamp: str, frame: np.ndarray) -> int:
         """Save a raw label frame for training-data collection. Returns the new ID."""
+        # Save image first (outside DB transaction)
+        # We need to get the ID first, then save image, then update - do in single transaction
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO collected_frames (timestamp) VALUES (?)",
                 (timestamp,),
             )
             frame_id = cur.lastrowid
-            self._conn.commit()
-
-        fname = f"{frame_id}.jpg"
-        fpath = self._collect_dir / fname
+            
+            fname = f"{frame_id}.jpg"
+            fpath = self._collect_dir / fname
+            # Release lock temporarily to write image
         cv2.imwrite(str(fpath), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
         image_path = f"collected_frames/{fname}"
-
+        
         with self._lock:
             self._conn.execute(
                 "UPDATE collected_frames SET image_path = ? WHERE id = ?",
