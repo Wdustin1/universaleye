@@ -8,6 +8,8 @@ import { ReferenceComparison } from "@/components/dashboard/reference-comparison
 import { DefectLog } from "@/components/dashboard/defect-log"
 import { InspectionControls } from "@/components/dashboard/inspection-controls"
 import { DefectBreakdown } from "@/components/dashboard/defect-breakdown"
+import { DefectAlertOverlay } from "@/components/dashboard/defect-alert"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { API } from "@/lib/api"
 
 export default function Page() {
@@ -36,6 +38,7 @@ export default function Page() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
+      <DefectAlertOverlay />
       {/* Header */}
       <DashboardHeader
         defectCount={defectCount}
@@ -44,13 +47,15 @@ export default function Page() {
       />
 
       {/* Stats Bar */}
-      <StatsBar />
+      <ErrorBoundary>
+        <StatsBar />
+      </ErrorBoundary>
 
       {/* Main Content Area */}
       <div className="flex-1 flex min-h-0">
         {/* Left Column: Controls */}
         <aside className="w-44 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
-          <InspectionControls hasReference={hasReference} />
+          <InspectionControls hasReference={hasReference} status={status} />
         </aside>
 
         {/* Center: Main viewport */}
@@ -59,22 +64,30 @@ export default function Page() {
           <div className="flex-1 flex min-h-0">
             {/* Live Feed - dominant panel */}
             <div className="flex-[5] min-w-0 border-r border-border bg-card overflow-hidden">
-              <LiveFeedPanel hasReference={hasReference} onReferenceSet={() => setHasReference(true)} />
+              <ErrorBoundary>
+                <LiveFeedPanel hasReference={hasReference} defectCount={defectCount} onReferenceSet={() => setHasReference(true)} />
+              </ErrorBoundary>
             </div>
             {/* Reference Comparison */}
             <div className="flex-[2] min-w-0 bg-card overflow-hidden">
-              <ReferenceComparison />
+              <ErrorBoundary>
+                <ReferenceComparison />
+              </ErrorBoundary>
             </div>
           </div>
 
           {/* Bottom bar: Breakdown */}
           <div className="h-36 flex-shrink-0 border-t border-border bg-card overflow-hidden">
-            <DefectBreakdown />
+            <ErrorBoundary>
+              <DefectBreakdown />
+            </ErrorBoundary>
           </div>
         </main>
 
         {/* Defect Log - slide-out panel */}
-        <DefectLog open={defectLogOpen} onOpenChange={setDefectLogOpen} />
+        <ErrorBoundary>
+          <DefectLog open={defectLogOpen} onOpenChange={setDefectLogOpen} />
+        </ErrorBoundary>
       </div>
     </div>
   )

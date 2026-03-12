@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Play,
   Pause,
@@ -8,46 +8,75 @@ import {
   SlidersHorizontal,
   Camera,
   RotateCcw,
+  Database,
 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { API } from "@/lib/api"
 
 type InspectionState = "running" | "paused" | "stopped"
 
-export function InspectionControls({ hasReference = true }: { hasReference?: boolean }) {
-  const [state, setState] = useState<InspectionState>("stopped")
+export function InspectionControls({
+  hasReference = true,
+  status = "stopped",
+}: {
+  hasReference?: boolean
+  status?: InspectionState
+}) {
+  // Local state gives instant feedback on button clicks; the useEffect below
+  // corrects it whenever the backend-polled `status` prop changes.
+  const [state, setState] = useState<InspectionState>(status)
   const [sensitivity, setSensitivity] = useState(75)
+  const [collecting, setCollecting] = useState(false)
+  const sensitivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Keep local state in sync with backend truth (polled every 2 s from page.tsx)
+  useEffect(() => {
+    setState(status)
+  }, [status])
 
   const handleStart = async () => {
+    setState("running") // optimistic
     try {
       await fetch(API.inspectionStart, { method: "POST" })
-      setState("running")
     } catch { /* backend not available */ }
   }
 
   const handlePause = async () => {
+    setState("paused") // optimistic
     try {
       await fetch(API.inspectionPause, { method: "POST" })
-      setState("paused")
     } catch { /* backend not available */ }
   }
 
   const handleStop = async () => {
+    setState("stopped") // optimistic
     try {
       await fetch(API.inspectionStop, { method: "POST" })
-      setState("stopped")
     } catch { /* backend not available */ }
   }
 
-  const handleSensitivity = async (value: number) => {
-    setSensitivity(value)
+  const handleCollectToggle = async () => {
+    const next = !collecting
+    setCollecting(next)
     try {
-      await fetch(API.sensitivity, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sensitivity: value }),
-      })
+      await fetch(next ? API.collectionStart : API.collectionStop, { method: "POST" })
     } catch { /* backend not available */ }
+  }
+
+  const handleSensitivity = (value: number) => {
+    setSensitivity(value)
+    // Debounce — only fire the API call 200 ms after the slider settles
+    if (sensitivityTimer.current) clearTimeout(sensitivityTimer.current)
+    sensitivityTimer.current = setTimeout(async () => {
+      try {
+        await fetch(API.sensitivity, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sensitivity: value }),
+        })
+      } catch { /* backend not available */ }
+    }, 200)
   }
 
   const handleNewReference = async () => {
@@ -211,6 +240,37 @@ export function InspectionControls({ hasReference = true }: { hasReference?: boo
               <RotateCcw className="w-3 h-3 flex-shrink-0" />
               Reset to Original
             </Button>
+          </div>
+        </div>
+
+        {/* Data Collection */}
+        <div className="pt-4 border-t border-border -mx-3 px-3">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+            Training Data
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={handleCollectToggle}
+              className={`flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-medium transition-all w-full ${
+                collecting
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${collecting ? "bg-primary animate-pulse" : "bg-muted-foreground"}`} />
+              {collecting ? "Collecting…" : "Collect Frames"}
+            </button>
+            <Link href="/collect" target="_blank">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2 w-full"
+              >
+                <Database className="w-3 h-3 flex-shrink-0" />
+                Label Frames
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -51,6 +52,11 @@ class InspectionConfig:
     # Defect severity — based on worst-block SSIM
     critical_ssim: float = 0.30
     major_ssim: float = 0.55
+
+    # Storage — set DATA_DIR env var to redirect all data to an external drive
+    # e.g. DATA_DIR=/Volumes/UniversalEye uvicorn main:app ...
+    # Defaults to backend/data/ if not set.
+    data_dir: Path | None = None
 
     # Server
     host: str = "0.0.0.0"
@@ -95,6 +101,16 @@ class InspectionConfig:
         )
 
 
+def _resolve_data_dir() -> "Path | None":
+    raw = os.environ.get("DATA_DIR")
+    if raw:
+        p = Path(raw).expanduser().resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    return None
+
+
 config = InspectionConfig(
     video_file=os.environ.get("VIDEO_FILE"),
+    data_dir=_resolve_data_dir(),
 )

@@ -4,7 +4,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { History } from "lucide-react"
 
-export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; status?: string; onDefectHistoryClick?: () => void }) {
+export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectCount?: number; onDefectHistoryClick?: () => void }) {
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shadow-[0_1px_3px_0_rgba(0,0,0,0.3)]">
       <div />
@@ -44,42 +44,5 @@ export function DashboardHeader({ defectCount, onDefectHistoryClick }: { defectC
         </Button>
       </div>
     </header>
-  )
-}
-
-function StatusIndicator({ status }: { status: "inspecting" | "idle" | "paused" | "error" }) {
-  const config = {
-    inspecting: { label: "Inspecting", pulse: true },
-    idle: { label: "Idle", pulse: false },
-    paused: { label: "Paused", pulse: false },
-    error: { label: "Error", pulse: true },
-  }
-
-  const { label, pulse } = config[status]
-
-  return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary">
-      <div className="relative">
-        <Circle
-          className={`w-2 h-2 fill-current ${
-            status === "inspecting"
-              ? "text-success"
-              : status === "error"
-                ? "text-destructive"
-                : status === "paused"
-                  ? "text-warning"
-                  : "text-muted-foreground"
-          }`}
-        />
-        {pulse && (
-          <Circle
-            className={`w-2 h-2 absolute inset-0 fill-current animate-ping ${
-              status === "inspecting" ? "text-success" : "text-destructive"
-            }`}
-          />
-        )}
-      </div>
-      <span className="text-xs font-medium text-foreground">{label}</span>
-    </div>
   )
 }

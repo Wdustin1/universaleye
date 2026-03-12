@@ -71,3 +71,7 @@ class DefectBreakdownItem(BaseModel):
 
 class SensitivityRequest(BaseModel):
     sensitivity: int
+
+
+class CollectionLabelRequest(BaseModel):
+    label: Optional[str]  # 'good' | 'bad' | None to clear

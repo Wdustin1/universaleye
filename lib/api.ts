@@ -2,7 +2,26 @@
  * Backend API configuration.
  * In development, the Python backend runs on port 8000.
  */
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+/**
+ * Validates that a URL is safe for use in the frontend.
+ * Ensures it uses http/https protocol and has a valid hostname.
+ */
+function validateApiUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      console.warn(`Invalid API URL protocol: ${parsed.protocol}. Defaulting to http://localhost:8000`)
+      return "http://localhost:8000"
+    }
+    return url
+  } catch {
+    console.warn(`Invalid API URL: ${url}. Defaulting to http://localhost:8000`)
+    return "http://localhost:8000"
+  }
+}
+
+const API_BASE = validateApiUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
 
 export const API = {
   videoFeed: `${API_BASE}/video_feed`,
@@ -20,4 +39,12 @@ export const API = {
   resetReference: `${API_BASE}/api/reset_reference`,
   events: `${API_BASE}/api/events`,
   health: `${API_BASE}/api/health`,
+  // Data collection
+  collectionStart: `${API_BASE}/api/collection/start`,
+  collectionStop: `${API_BASE}/api/collection/stop`,
+  collectionStats: `${API_BASE}/api/collection/stats`,
+  collectionFrames: `${API_BASE}/api/collection/frames`,
+  collectionFrameImage: (id: number) => `${API_BASE}/api/collection/frames/${id}/image`,
+  collectionFrameLabel: (id: number) => `${API_BASE}/api/collection/frames/${id}/label`,
+  collectionClear: `${API_BASE}/api/collection/clear`,
 } as const

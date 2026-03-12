@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react"
 import { X } from "lucide-react"
 import { API } from "@/lib/api"
+import { useFocusTrap } from "@/hooks/use-focus-trap"
 
 interface Defect {
   id: number
@@ -47,8 +48,10 @@ export function DefectDetail({ defect, onClose }: DefectDetailProps) {
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [handleKeyDown])
 
+  const containerRef = useFocusTrap(true)
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="defect-detail-title">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-background/70 backdrop-blur-sm"
@@ -57,11 +60,14 @@ export function DefectDetail({ defect, onClose }: DefectDetailProps) {
       />
 
       {/* Modal */}
-      <div className="relative z-10 w-[90vw] max-w-4xl max-h-[85vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col overflow-hidden">
+      <div 
+        ref={containerRef}
+        className="relative z-10 w-[90vw] max-w-4xl max-h-[85vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-foreground">
+            <span id="defect-detail-title" className="text-sm font-medium text-foreground">
               Defect #{defect.id}
             </span>
             <span className="text-xs text-muted-foreground">{defect.type}</span>

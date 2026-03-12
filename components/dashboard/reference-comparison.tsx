@@ -1,39 +1,40 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { AlertTriangle } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { AlertTriangle, Loader2 } from "lucide-react"
 import { API } from "@/lib/api"
+import { usePolling } from "@/hooks/use-polling"
 
 export function ReferenceComparison() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [lastDefectId, setLastDefectId] = useState<number | null>(null)
   const [lastDefectType, setLastDefectType] = useState<string | null>(null)
   const [lastDefectSeverity, setLastDefectSeverity] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Poll for latest defect and refresh reference image
-  useEffect(() => {
-    const poll = async () => {
-      setRefreshKey((k) => k + 1)
-      try {
-        const res = await fetch(`${API.defects}?limit=1`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.length > 0) {
-            setLastDefectId(data[0].id)
-            setLastDefectType(data[0].type ?? null)
-            setLastDefectSeverity(data[0].severity ?? null)
-          } else {
-            setLastDefectId(null)
-            setLastDefectType(null)
-            setLastDefectSeverity(null)
-          }
+  const fetchDefects = useCallback(async () => {
+    setRefreshKey((k) => k + 1)
+    try {
+      const res = await fetch(`${API.defects}?limit=1`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.length > 0) {
+          setLastDefectId(data[0].id)
+          setLastDefectType(data[0].type ?? null)
+          setLastDefectSeverity(data[0].severity ?? null)
+        } else {
+          setLastDefectId(null)
+          setLastDefectType(null)
+          setLastDefectSeverity(null)
         }
-      } catch { /* backend not available */ }
+        setLoading(false)
+      }
+    } catch {
+      setLoading(false)
     }
-    poll()
-    const interval = setInterval(poll, 2000)
-    return () => clearInterval(interval)
   }, [])
+
+  usePolling(fetchDefects, 2000, true)
 
   return (
     <div className="flex flex-col h-full">
@@ -41,6 +42,7 @@ export function ReferenceComparison() {
         <h2 className="text-xs font-medium text-foreground uppercase tracking-wider">
           Reference / Last Defect
         </h2>
+        {loading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
       </div>
 
       <div className="flex-1 p-3">
@@ -59,6 +61,10 @@ export function ReferenceComparison() {
                 src={`${API.referenceImage}?t=${refreshKey}`}
                 alt="Reference golden master label"
                 className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget
+                  target.style.display = "none"
+                }}
               />
             </div>
           </div>

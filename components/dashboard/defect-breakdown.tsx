@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { API } from "@/lib/api"
+import { usePolling } from "@/hooks/use-polling"
 
 interface BreakdownItem {
   type: string
@@ -11,18 +12,21 @@ interface BreakdownItem {
 
 export function DefectBreakdown() {
   const [defectData, setDefectData] = useState<BreakdownItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch(API.defectBreakdown)
-        if (res.ok) setDefectData(await res.json())
-      } catch { /* backend not available */ }
+  const fetchBreakdown = useCallback(async () => {
+    try {
+      const res = await fetch(API.defectBreakdown)
+      if (res.ok) {
+        setDefectData(await res.json())
+        setLoading(false)
+      }
+    } catch {
+      setLoading(false)
     }
-    poll()
-    const interval = setInterval(poll, 5000)
-    return () => clearInterval(interval)
   }, [])
+
+  usePolling(fetchBreakdown, 5000, true)
 
   const totalCount = defectData.reduce((sum, d) => sum + d.count, 0)
   const maxCount = defectData.length > 0 ? Math.max(...defectData.map((d) => d.count)) : 1
@@ -38,7 +42,9 @@ export function DefectBreakdown() {
         </span>
       </div>
       <div className="flex-1 px-3 py-1 flex flex-col justify-center gap-1">
-        {defectData.length === 0 ? (
+        {loading && defectData.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground text-center">Loading...</p>
+        ) : defectData.length === 0 ? (
           <p className="text-[10px] text-muted-foreground text-center">No defects detected</p>
         ) : (
           defectData.map((item) => {

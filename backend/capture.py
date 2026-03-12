@@ -46,6 +46,9 @@ class CaptureManager:
         self._labels_inspected: int = 0
         self._start_time: datetime | None = None
 
+        # Data collection mode — saves every inspected label frame for labeling
+        self._collect_mode: bool = False
+
         # State machine (only accessed from capture thread)
         self._state_machine = MotionStateMachine(config)
 
@@ -168,6 +171,10 @@ class CaptureManager:
 
             frame = self._crop_frame(raw)
 
+            # Snapshot everything needed for inspection while holding the lock,
+            # then run the expensive SSIM pass *outside* the lock so the MJPEG
+            # stream is never blocked during a label inspection (50-200 ms).
+            inspect_data: tuple | None = None
             with self._lock:
                 self._latest_frame = frame
 
@@ -175,25 +182,45 @@ class CaptureManager:
                     sm_state = self._state_machine.process_frame(frame)
 
                     if sm_state == State.INSPECT and self._reference_image is not None:
-                        self._run_inspection(self._state_machine.locked_frame)
+                        inspect_data = (
+                            self._state_machine.locked_frame.copy(),
+                            self._reference_image.copy(),
+                            self._sensitivity,
+                        )
+                        self._labels_inspected += 1
                         self._state_machine.acknowledge_inspection()
+
+            # Runs without the lock — stream stays live during inspection.
+            if inspect_data is not None:
+                self._run_inspection(*inspect_data)
+                # In collect mode, save the raw frame for operator labeling.
+                with self._lock:
+                    collecting = self._collect_mode
+                if collecting:
+                    self._save_collected_frame(inspect_data[0])
 
             elapsed = time.monotonic() - loop_start
             sleep_time = frame_interval - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-    def _run_inspection(self, locked_frame: np.ndarray) -> None:
-        """Run SSIM inspection on the locked frame. Called with _lock held."""
-        self._labels_inspected += 1
-        self._last_inspected_frame = locked_frame.copy()
+    def _run_inspection(
+        self,
+        locked_frame: np.ndarray,
+        reference: np.ndarray,
+        sensitivity: int,
+    ) -> None:
+        """Run SSIM inspection on a snapshot of the locked frame.
 
-        result = inspect_frame(
-            locked_frame,
-            self._reference_image,
-            self.config,
-            self._sensitivity,
-        )
+        Called **without** ``_lock`` held so the MJPEG stream is never
+        blocked during the expensive SSIM computation.  The lock is
+        re-acquired briefly at the end only to store ``_last_inspected_frame``.
+        """
+        result = inspect_frame(locked_frame, reference, self.config, sensitivity)
+
+        # Store the inspected frame for the reference-comparison panel.
+        with self._lock:
+            self._last_inspected_frame = locked_frame
 
         if result.is_defect:
             now = datetime.now()
@@ -220,6 +247,16 @@ class CaptureManager:
                     callback(defect)
                 except Exception:
                     logger.exception("SSE callback error")
+
+    def _save_collected_frame(self, frame: np.ndarray) -> None:
+        """Persist a raw label frame to the collection store. No lock held."""
+        try:
+            self._db.insert_collected_frame(
+                timestamp=datetime.now().isoformat(timespec="seconds"),
+                frame=frame,
+            )
+        except Exception:
+            logger.exception("Failed to save collected frame")
 
     # ------ Public API (called from FastAPI routes) ------
 
@@ -322,3 +359,39 @@ class CaptureManager:
             self._event_callbacks.remove(callback)
         except ValueError:
             pass
+
+    # ------ Data Collection ------
+
+    def start_collect_mode(self) -> None:
+        with self._lock:
+            self._collect_mode = True
+        logger.info("Collect mode ON")
+
+    def stop_collect_mode(self) -> None:
+        with self._lock:
+            self._collect_mode = False
+        logger.info("Collect mode OFF")
+
+    def is_collect_mode(self) -> bool:
+        with self._lock:
+            return self._collect_mode
+
+    def get_collected_frames(
+        self, offset: int = 0, limit: int = 50, label_filter: str | None = None
+    ) -> list:
+        return self._db.get_collected_frames(offset, limit, label_filter)
+
+    def label_collected_frame(self, frame_id: int, label: str | None) -> bool:
+        return self._db.label_collected_frame(frame_id, label)
+
+    def get_collection_stats(self) -> dict:
+        stats = self._db.get_collection_stats()
+        with self._lock:
+            stats["collecting"] = self._collect_mode
+        return stats
+
+    def get_collected_frame_path(self, frame_id: int):
+        return self._db.get_collected_frame_path(frame_id)
+
+    def clear_collected_frames(self) -> None:
+        self._db.clear_collected_frames()

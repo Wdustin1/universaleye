@@ -12,27 +12,28 @@ import {
 import { Button } from "@/components/ui/button"
 import { API } from "@/lib/api"
 
-export function LiveFeedPanel({ hasReference = true, onReferenceSet }: { hasReference?: boolean; onReferenceSet?: () => void }) {
+export function LiveFeedPanel({
+  hasReference = true,
+  defectCount = 0,
+  onReferenceSet,
+}: {
+  hasReference?: boolean
+  defectCount?: number
+  onReferenceSet?: () => void
+}) {
   const [zoom, setZoom] = useState(1)
   const [showGrid, setShowGrid] = useState(false)
-  const [defectCount, setDefectCount] = useState(0)
   const [timestamp, setTimestamp] = useState("--:--:--")
   const [captureReady, setCaptureReady] = useState(false)
 
-  // Poll stats for defect count and update timestamp
+  // Update timestamp from local clock — no extra API poll needed.
+  // defectCount is now passed in from page.tsx which already polls /stats.
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch(API.stats)
-        if (res.ok) {
-          const data = await res.json()
-          setDefectCount(data.defectsFound ?? 0)
-        }
-      } catch { /* backend not available */ }
-      setTimestamp(new Date().toLocaleTimeString("en-GB"))
-    }
-    poll()
-    const interval = setInterval(poll, 2000)
+    setTimestamp(new Date().toLocaleTimeString("en-GB"))
+    const interval = setInterval(
+      () => setTimestamp(new Date().toLocaleTimeString("en-GB")),
+      1000,
+    )
     return () => clearInterval(interval)
   }, [])
 

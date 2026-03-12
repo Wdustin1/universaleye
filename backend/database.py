@@ -14,9 +14,26 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent / "data"
-DB_PATH = DATA_DIR / "defects.db"
-IMAGE_DIR = DATA_DIR / "defect_images"
+_DEFAULT_DATA_DIR = Path(__file__).parent / "data"
+
+
+def _default_data_dir() -> Path:
+    """Returns DATA_DIR from config if set, otherwise the sibling data/ folder."""
+    try:
+        from config import config  # imported lazily to avoid circular import at module load
+        if config.data_dir is not None:
+            return config.data_dir
+    except Exception:
+        pass
+    return _DEFAULT_DATA_DIR
+
+
+def _resolve_paths() -> tuple[Path, Path, Path]:
+    base = _default_data_dir()
+    return base / "defects.db", base / "defect_images", base / "collected_frames"
+
+
+DB_PATH, IMAGE_DIR, COLLECT_DIR = _resolve_paths()
 
 _CREATE_TABLE = """\
 CREATE TABLE IF NOT EXISTS defects (
@@ -28,11 +45,19 @@ CREATE TABLE IF NOT EXISTS defects (
     ssim_score  REAL,
     image_path  TEXT
 );
+CREATE TABLE IF NOT EXISTS collected_frames (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp   TEXT NOT NULL,
+    image_path  TEXT,
+    label       TEXT DEFAULT NULL  -- 'good' | 'bad' | NULL (unlabeled)
+);
 """
 
 _CREATE_INDEXES = """\
 CREATE INDEX IF NOT EXISTS idx_defects_timestamp ON defects(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_defects_type ON defects(type);
+CREATE INDEX IF NOT EXISTS idx_collected_timestamp ON collected_frames(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_collected_label ON collected_frames(label);
 """
 
 
@@ -59,14 +84,17 @@ class DefectDatabase:
         self,
         db_path: Optional[Path] = None,
         image_dir: Optional[Path] = None,
+        collect_dir: Optional[Path] = None,
     ) -> None:
         self._db_path = db_path or DB_PATH
         self._image_dir = image_dir or IMAGE_DIR
+        self._collect_dir = collect_dir or COLLECT_DIR
         self._lock = threading.Lock()
 
         # Ensure directories exist
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._image_dir.mkdir(parents=True, exist_ok=True)
+        self._collect_dir.mkdir(parents=True, exist_ok=True)
 
         self._conn = sqlite3.connect(
             str(self._db_path), check_same_thread=False,
@@ -177,6 +205,110 @@ class DefectDatabase:
         """Absolute path to the annotated JPEG, or None."""
         p = self._image_dir / f"{defect_id}.jpg"
         return p if p.exists() else None
+
+    # ------------------------------------------------------------------
+    # Data Collection (training data capture)
+    # ------------------------------------------------------------------
+
+    def insert_collected_frame(self, timestamp: str, frame: np.ndarray) -> int:
+        """Save a raw label frame for training-data collection. Returns the new ID."""
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO collected_frames (timestamp) VALUES (?)",
+                (timestamp,),
+            )
+            frame_id = cur.lastrowid
+            self._conn.commit()
+
+        fname = f"{frame_id}.jpg"
+        fpath = self._collect_dir / fname
+        cv2.imwrite(str(fpath), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        image_path = f"collected_frames/{fname}"
+
+        with self._lock:
+            self._conn.execute(
+                "UPDATE collected_frames SET image_path = ? WHERE id = ?",
+                (image_path, frame_id),
+            )
+            self._conn.commit()
+
+        return frame_id
+
+    def get_collected_frames(
+        self,
+        offset: int = 0,
+        limit: int = 50,
+        label_filter: Optional[str] = None,  # 'good' | 'bad' | 'unlabeled' | None
+    ) -> list:
+        with self._lock:
+            if label_filter == "unlabeled":
+                rows = self._conn.execute(
+                    "SELECT id, timestamp, image_path, label FROM collected_frames"
+                    " WHERE label IS NULL ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+            elif label_filter in ("good", "bad"):
+                rows = self._conn.execute(
+                    "SELECT id, timestamp, image_path, label FROM collected_frames"
+                    " WHERE label = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (label_filter, limit, offset),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT id, timestamp, image_path, label FROM collected_frames"
+                    " ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+        return [
+            {
+                "id": r[0],
+                "timestamp": r[1],
+                "imagePath": r[2],
+                "label": r[3],
+            }
+            for r in rows
+        ]
+
+    def label_collected_frame(self, frame_id: int, label: Optional[str]) -> bool:
+        """Set label to 'good', 'bad', or None (unlabeled). Returns True if found."""
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE collected_frames SET label = ? WHERE id = ?",
+                (label, frame_id),
+            )
+            self._conn.commit()
+            return cur.rowcount > 0
+
+    def get_collection_stats(self) -> dict:
+        with self._lock:
+            total = self._conn.execute(
+                "SELECT COUNT(*) FROM collected_frames"
+            ).fetchone()[0]
+            good = self._conn.execute(
+                "SELECT COUNT(*) FROM collected_frames WHERE label = 'good'"
+            ).fetchone()[0]
+            bad = self._conn.execute(
+                "SELECT COUNT(*) FROM collected_frames WHERE label = 'bad'"
+            ).fetchone()[0]
+        return {
+            "total": total,
+            "good": good,
+            "bad": bad,
+            "unlabeled": total - good - bad,
+        }
+
+    def get_collected_frame_path(self, frame_id: int) -> Optional[Path]:
+        p = self._collect_dir / f"{frame_id}.jpg"
+        return p if p.exists() else None
+
+    def clear_collected_frames(self) -> None:
+        with self._lock:
+            self._conn.execute("DELETE FROM collected_frames")
+            self._conn.commit()
+        if self._collect_dir.exists():
+            shutil.rmtree(self._collect_dir)
+            self._collect_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Collected frames cleared")
 
     # ------------------------------------------------------------------
     # Maintenance

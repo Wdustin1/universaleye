@@ -19,7 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 from capture import CaptureManager
 from config import config
 from database import DefectDatabase
-from models import SensitivityRequest
+from models import CollectionLabelRequest, SensitivityRequest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,6 +206,64 @@ async def events():
             capture_manager.unregister_event_callback(on_defect)
 
     return EventSourceResponse(event_generator())
+
+
+# ------ Data Collection ------
+
+@app.post("/api/collection/start")
+async def collection_start():
+    capture_manager.start_collect_mode()
+    return {"collecting": True}
+
+
+@app.post("/api/collection/stop")
+async def collection_stop():
+    capture_manager.stop_collect_mode()
+    return {"collecting": False}
+
+
+@app.get("/api/collection/stats")
+async def collection_stats():
+    return capture_manager.get_collection_stats()
+
+
+@app.get("/api/collection/frames")
+async def collection_frames(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    label: str | None = Query(None),  # 'good' | 'bad' | 'unlabeled' | None
+):
+    return capture_manager.get_collected_frames(
+        offset=offset, limit=limit, label_filter=label
+    )
+
+
+@app.put("/api/collection/frames/{frame_id}/label")
+async def label_frame(frame_id: int, body: CollectionLabelRequest):
+    if body.label not in (None, "good", "bad"):
+        return Response(
+            content=json.dumps({"error": "label must be 'good', 'bad', or null"}),
+            status_code=400,
+            media_type="application/json",
+        )
+    found = capture_manager.label_collected_frame(frame_id, body.label)
+    if not found:
+        return Response(status_code=404)
+    return {"id": frame_id, "label": body.label}
+
+
+@app.get("/api/collection/frames/{frame_id}/image")
+async def collected_frame_image(frame_id: int):
+    path = capture_manager.get_collected_frame_path(frame_id)
+    if path is None or not path.exists():
+        return Response(status_code=404)
+    return Response(content=path.read_bytes(), media_type="image/jpeg")
+
+
+@app.delete("/api/collection/clear")
+async def collection_clear():
+    capture_manager.clear_collected_frames()
+    return {"status": "cleared"}
 
 
 # ------ Health Check ------
