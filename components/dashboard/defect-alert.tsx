@@ -12,9 +12,10 @@
  * operator dismisses it.  The SSE connection auto-reconnects on drop.
  */
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, X } from "lucide-react"
 import { API } from "@/lib/api"
+import { useSSE } from "@/hooks/use-polling"
 
 interface DefectEvent {
   id: number
@@ -35,64 +36,26 @@ export function DefectAlertOverlay() {
   const [flash, setFlash] = useState(false)
   const [activeAlert, setActiveAlert] = useState<DefectEvent | null>(null)
   const [alertCount, setAlertCount] = useState(0)
-  const [connected, setConnected] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const esRef = useRef<EventSource | null>(null)
-  const retryCountRef = useRef(0)
-  const maxRetries = 5
-  const baseDelay = 1000
+
+  const onDefectEvent = useCallback((raw: string) => {
+    try {
+      const data = JSON.parse(raw) as DefectEvent
+      setActiveAlert(data)
+      setAlertCount((c) => c + 1)
+
+      setFlash(true)
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => setFlash(false), 650)
+    } catch (err) {
+      console.error("Failed to parse SSE defect event:", err)
+    }
+  }, [])
+  useSSE(API.events, { events: { defect: onDefectEvent } })
 
   useEffect(() => {
-    let retryTimer: ReturnType<typeof setTimeout> | null = null
-
-    const connect = () => {
-      const es = new EventSource(API.events)
-      esRef.current = es
-
-      es.onopen = () => {
-        setConnected(true)
-        retryCountRef.current = 0
-      }
-
-      es.addEventListener("defect", (e) => {
-        try {
-          const data = JSON.parse(e.data) as DefectEvent
-          // Update persistent banner (show latest, accumulate count)
-          setActiveAlert(data)
-          setAlertCount((c) => c + 1)
-
-          // Trigger flash
-          setFlash(true)
-          if (flashTimer.current) clearTimeout(flashTimer.current)
-          flashTimer.current = setTimeout(() => setFlash(false), 650)
-        } catch (err) {
-          console.error("Failed to parse SSE defect event:", err)
-        }
-      })
-
-      es.onerror = () => {
-        setConnected(false)
-        es.close()
-        esRef.current = null
-
-        // Exponential backoff
-        if (retryCountRef.current < maxRetries) {
-          const delay = baseDelay * Math.pow(2, retryCountRef.current)
-          retryCountRef.current++
-          console.log(`SSE connection lost. Retrying in ${delay}ms (attempt ${retryCountRef.current})`)
-          retryTimer = setTimeout(connect, delay)
-        } else {
-          console.error("SSE max retries exceeded")
-        }
-      }
-    }
-
-    connect()
-
     return () => {
-      esRef.current?.close()
       if (flashTimer.current) clearTimeout(flashTimer.current)
-      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [])
 

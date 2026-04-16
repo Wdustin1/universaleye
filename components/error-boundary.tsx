@@ -5,11 +5,20 @@ import { Component, ReactNode } from "react"
 interface Props {
   children: ReactNode
   fallback?: ReactNode
+  /** When any value in this array changes, the boundary auto-resets. */
+  resetKeys?: unknown[]
 }
 
 interface State {
   hasError: boolean
   error?: Error
+}
+
+function keysDiffer(a: unknown[] | undefined, b: unknown[] | undefined): boolean {
+  if (a === b) return false
+  if (!a || !b || a.length !== b.length) return true
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return true
+  return false
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -24,6 +33,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo)
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && keysDiffer(prevProps.resetKeys, this.props.resetKeys)) {
+      this.setState({ hasError: false, error: undefined })
+    }
   }
 
   handleReset = () => {

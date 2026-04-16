@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Maximize2,
   ZoomIn,
@@ -10,7 +10,8 @@ import {
   Camera,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
+import { usePolling } from "@/hooks/use-polling"
 
 export function LiveFeedPanel({
   hasReference = true,
@@ -25,9 +26,12 @@ export function LiveFeedPanel({
   const [showGrid, setShowGrid] = useState(false)
   const [timestamp, setTimestamp] = useState("--:--:--")
   const [captureReady, setCaptureReady] = useState(false)
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Update timestamp from local clock — no extra API poll needed.
   // defectCount is now passed in from page.tsx which already polls /stats.
+  /* eslint-disable react-hooks/set-state-in-effect -- syncing to wall clock IS the external system */
   useEffect(() => {
     setTimestamp(new Date().toLocaleTimeString("en-GB"))
     const interval = setInterval(
@@ -36,6 +40,32 @@ export function LiveFeedPanel({
     )
     return () => clearInterval(interval)
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Poll /api/health so the chrome reflects whether a real camera is attached
+  // (vs. backend running in placeholder mode).
+  const pollHealth = useCallback(async () => {
+    try {
+      const res = await apiFetch(API.health)
+      if (res.ok) {
+        const data = await res.json()
+        setCameraAvailable(Boolean(data.camera_available))
+      }
+    } catch {
+      setCameraAvailable(null)
+    }
+  }, [])
+  usePolling(pollHealth, 5000, true)
+
+  const toggleFullscreen = () => {
+    const el = containerRef.current
+    if (!el) return
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    } else {
+      el.requestFullscreen().catch(() => {})
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -86,13 +116,13 @@ export function LiveFeedPanel({
             <RotateCcw className="w-3 h-3 text-muted-foreground" />
             <span className="sr-only">Reset zoom</span>
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleFullscreen}>
             <Maximize2 className="w-3 h-3 text-muted-foreground" />
             <span className="sr-only">Fullscreen</span>
           </Button>
         </div>
       </div>
-      <div className="flex-1 relative overflow-hidden bg-background">
+      <div ref={containerRef} className="flex-1 relative overflow-hidden bg-background">
         {/* MJPEG stream from Python backend */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -126,13 +156,23 @@ export function LiveFeedPanel({
             {defectCount} defect{defectCount !== 1 ? "s" : ""} detected
           </span>
         </div>
-        {/* Camera info overlay */}
+        {/* Camera info overlay — driven by /api/health so placeholder mode is honest */}
         <div className="absolute top-3 right-3 flex items-center gap-2 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
-          <span className="text-[10px] font-mono text-muted-foreground">CAM-01</span>
+          <span className="text-[10px] font-mono text-muted-foreground">CAM</span>
           <div className="w-px h-3 bg-border" />
-          <span className="text-[10px] font-mono text-muted-foreground">1920px</span>
-          <div className="w-px h-3 bg-border" />
-          <span className="text-[10px] font-mono text-muted-foreground">30fps</span>
+          <span className={`text-[10px] font-mono ${
+            cameraAvailable === null
+              ? "text-muted-foreground"
+              : cameraAvailable
+                ? "text-success"
+                : "text-warning"
+          }`}>
+            {cameraAvailable === null
+              ? "…"
+              : cameraAvailable
+                ? "live"
+                : "no signal"}
+          </span>
         </div>
         {/* Timestamp overlay */}
         <div className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded bg-card/80 border border-border backdrop-blur-sm">
@@ -169,7 +209,7 @@ export function LiveFeedPanel({
               type="button"
               onClick={async () => {
                 try {
-                  const res = await fetch(API.setReference, { method: "POST" })
+                  const res = await apiFetch(API.setReference, { method: "POST" })
                   if (res.ok) {
                     setCaptureReady(false)
                     onReferenceSet?.()

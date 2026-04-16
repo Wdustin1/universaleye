@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { AlertTriangle, Loader2 } from "lucide-react"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
 
 export function ReferenceComparison() {
@@ -15,7 +15,7 @@ export function ReferenceComparison() {
   const fetchDefects = useCallback(async () => {
     setRefreshKey((k) => k + 1)
     try {
-      const res = await fetch(`${API.defects}?limit=1`)
+      const res = await apiFetch(`${API.defects}?limit=1`)
       if (res.ok) {
         const data = await res.json()
         if (data.length > 0) {

@@ -106,6 +106,7 @@ export function DefectDetail({ defect, onClose }: DefectDetailProps) {
 
         {/* Image */}
         <div className="flex-1 min-h-0 bg-background flex items-center justify-center overflow-auto p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={API.defectImage(defect.id)}
             alt={`Defect #${defect.id} — ${defect.type}`}

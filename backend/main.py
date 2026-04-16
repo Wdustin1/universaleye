@@ -152,6 +152,13 @@ async def inspection_stop():
     return {"status": "stopped"}
 
 
+@app.post("/api/defects/clear")
+async def defects_clear():
+    """Explicit destructive wipe of the defect database + annotated images."""
+    capture_manager.clear_defect_history()
+    return {"status": "cleared"}
+
+
 @app.put("/api/inspection/sensitivity")
 async def set_sensitivity(body: SensitivityRequest):
     capture_manager.set_sensitivity(body.sensitivity)
@@ -182,13 +189,21 @@ async def reset_reference():
 
 @app.get("/api/events")
 async def events():
-    event_queue: asyncio.Queue = asyncio.Queue()
+    # Bounded queue gives real backpressure if a slow client falls behind.
+    event_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    loop = asyncio.get_running_loop()
 
-    def on_defect(defect):
+    def _enqueue(defect) -> None:
+        # Runs on the event loop; safe to call put_nowait from here.
         try:
             event_queue.put_nowait(defect)
         except asyncio.QueueFull:
             logger.warning("SSE event queue full - defect event dropped")
+
+    def on_defect(defect):
+        # Called from the capture thread. asyncio.Queue is NOT thread-safe,
+        # so hop back to the event loop before touching it.
+        loop.call_soon_threadsafe(_enqueue, defect)
 
     capture_manager.register_event_callback(on_defect)
 

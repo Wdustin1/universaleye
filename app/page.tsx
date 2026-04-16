@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { StatsBar } from "@/components/dashboard/stats-bar"
 import { LiveFeedPanel } from "@/components/dashboard/live-feed"
@@ -10,7 +10,8 @@ import { InspectionControls } from "@/components/dashboard/inspection-controls"
 import { DefectBreakdown } from "@/components/dashboard/defect-breakdown"
 import { DefectAlertOverlay } from "@/components/dashboard/defect-alert"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
+import { usePolling } from "@/hooks/use-polling"
 
 export default function Page() {
   const [defectLogOpen, setDefectLogOpen] = useState(false)
@@ -18,23 +19,19 @@ export default function Page() {
   const [status, setStatus] = useState<"running" | "paused" | "stopped">("stopped")
   const [hasReference, setHasReference] = useState(false)
 
-  // Poll stats (includes reference status)
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch(API.stats)
-        if (res.ok) {
-          const data = await res.json()
-          setDefectCount(data.defectsFound ?? 0)
-          setStatus(data.status ?? "stopped")
-          setHasReference(data.hasReference ?? false)
-        }
-      } catch { /* backend not available */ }
-    }
-    poll()
-    const interval = setInterval(poll, 2000)
-    return () => clearInterval(interval)
+  const pollStats = useCallback(async () => {
+    try {
+      const res = await apiFetch(API.stats)
+      if (res.ok) {
+        const data = await res.json()
+        setDefectCount(data.defectsFound ?? 0)
+        setStatus(data.status ?? "stopped")
+        setHasReference(data.hasReference ?? false)
+      }
+    } catch { /* backend not available */ }
   }, [])
+
+  usePolling(pollStats, 2000, true)
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -42,7 +39,6 @@ export default function Page() {
       {/* Header */}
       <DashboardHeader
         defectCount={defectCount}
-        status={status}
         onDefectHistoryClick={() => setDefectLogOpen(true)}
       />
 

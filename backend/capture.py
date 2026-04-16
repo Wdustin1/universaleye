@@ -242,7 +242,10 @@ class CaptureManager:
                 ssim_score=result.ssim_score,
             )
 
-            for callback in self._event_callbacks:
+            # Snapshot under lock so register/unregister can't mutate during iteration.
+            with self._lock:
+                callbacks = list(self._event_callbacks)
+            for callback in callbacks:
                 try:
                     callback(defect)
                 except Exception:
@@ -318,8 +321,14 @@ class CaptureManager:
             self._labels_inspected = 0
             self._start_time = None
             self._last_inspected_frame = None
+        # Defect history is preserved across stops. Use the explicit
+        # /api/defects/clear endpoint when the operator wants a wipe.
+        logger.info("Inspection stopped, run-time stats reset (defect history preserved)")
+
+    def clear_defect_history(self) -> None:
+        """Wipe all defect rows and annotated images. Destructive."""
         self._db.clear_all()
-        logger.info("Inspection stopped, stats reset")
+        logger.info("Defect history cleared")
 
     def set_sensitivity(self, value: int) -> None:
         with self._lock:
@@ -352,13 +361,15 @@ class CaptureManager:
         return self._db.get_defect_image_path(defect_id)
 
     def register_event_callback(self, callback) -> None:
-        self._event_callbacks.append(callback)
+        with self._lock:
+            self._event_callbacks.append(callback)
 
     def unregister_event_callback(self, callback) -> None:
-        try:
-            self._event_callbacks.remove(callback)
-        except ValueError:
-            pass
+        with self._lock:
+            try:
+                self._event_callbacks.remove(callback)
+            except ValueError:
+                pass
 
     # ------ Data Collection ------
 

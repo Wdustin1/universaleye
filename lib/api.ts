@@ -23,6 +23,22 @@ function validateApiUrl(url: string): string {
 
 const API_BASE = validateApiUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
 
+/**
+ * Fetch with a request timeout. Default 5s — long enough for a healthy backend,
+ * short enough that a hung backend doesn't pin requests open forever.
+ *
+ * If the caller passes their own `signal`, we still apply the timeout via
+ * AbortSignal.any() so existing AbortController flows keep working.
+ */
+export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 5000): Promise<Response> {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs)
+  const signal = init.signal
+    // AbortSignal.any merges multiple signals; falls back to timeout-only when none was supplied.
+    ? AbortSignal.any([init.signal, timeoutSignal])
+    : timeoutSignal
+  return fetch(input, { ...init, signal })
+}
+
 export const API = {
   videoFeed: `${API_BASE}/video_feed`,
   referenceImage: `${API_BASE}/api/reference_image`,

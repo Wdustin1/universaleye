@@ -10,9 +10,9 @@
  * Keyboard shortcuts: G = good, B = bad, Space = skip to next
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, Trash2, RefreshCw } from "lucide-react"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
 import { ErrorBoundary } from "@/components/error-boundary"
 
 /**
@@ -57,14 +57,12 @@ export default function CollectPage() {
   const [stats, setStats] = useState<CollectionStats | null>(null)
   const [filter, setFilter] = useState<FilterMode>("unlabeled")
   const [offset, setOffset] = useState(0)
-  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<number | null>(null)
-  const pendingLabel = useRef<Record<number, string>>({})
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(API.collectionStats)
+      const res = await apiFetch(API.collectionStats)
       if (res.ok) setStats(await res.json())
     } catch { /* offline */ }
   }, [])
@@ -77,25 +75,21 @@ export default function CollectPage() {
         offset: String(o),
         ...(f !== "all" ? { label: f } : {}),
       })
-      const res = await fetch(`${API.collectionFrames}?${params}`)
+      const res = await apiFetch(`${API.collectionFrames}?${params}`)
       if (res.ok) {
         const data: CollectedFrame[] = await res.json()
         setFrames(data)
-        // Estimate total from what we got (backend doesn't paginate-count yet)
-        if (data.length === PAGE_SIZE) {
-          setTotal(o + PAGE_SIZE + 1) // at least one more page
-        } else {
-          setTotal(o + data.length)
-        }
       }
     } catch { /* offline */ }
     setLoading(false)
   }, [])
 
+  /* eslint-disable react-hooks/set-state-in-effect -- this effect IS the external-system fetch */
   useEffect(() => {
     fetchStats()
     fetchFrames(filter, offset)
   }, [filter, offset, fetchStats, fetchFrames])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const applyLabel = useCallback(
     async (frameId: number, label: "good" | "bad" | null) => {
@@ -104,7 +98,7 @@ export default function CollectPage() {
         prev.map((f) => (f.id === frameId ? { ...f, label } : f))
       )
       try {
-        await fetch(API.collectionFrameLabel(frameId), {
+        await apiFetch(API.collectionFrameLabel(frameId), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ label }),
@@ -136,15 +130,24 @@ export default function CollectPage() {
   const handleClear = async () => {
     if (!confirm("Delete all collected frames? This cannot be undone.")) return
     try {
-      await fetch(API.collectionClear, { method: "DELETE" })
+      await apiFetch(API.collectionClear, { method: "DELETE" })
       setFrames([])
       setStats(null)
       fetchStats()
     } catch { /* offline */ }
   }
 
+  // Real totals come from the backend stats endpoint, so pagination doesn't
+  // hallucinate an extra page when the count is exactly a multiple of PAGE_SIZE.
+  const totalForFilter = stats
+    ? filter === "all"
+      ? stats.total
+      : filter === "unlabeled"
+        ? stats.unlabeled
+        : stats[filter]
+    : 0
   const hasPrev = offset > 0
-  const hasNext = frames.length === PAGE_SIZE
+  const hasNext = offset + frames.length < totalForFilter
 
   return (
     <ErrorBoundary>

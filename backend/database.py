@@ -212,22 +212,20 @@ class DefectDatabase:
 
     def insert_collected_frame(self, timestamp: str, frame: np.ndarray) -> int:
         """Save a raw label frame for training-data collection. Returns the new ID."""
-        # Save image first (outside DB transaction)
-        # We need to get the ID first, then save image, then update - do in single transaction
+        # Single transaction: insert + image-write + path-update all under lock,
+        # so a concurrent clear_collected_frames can't race the directory away
+        # between the file write and the row update.
         with self._lock:
             cur = self._conn.execute(
                 "INSERT INTO collected_frames (timestamp) VALUES (?)",
                 (timestamp,),
             )
             frame_id = cur.lastrowid
-            
+
             fname = f"{frame_id}.jpg"
             fpath = self._collect_dir / fname
-            # Release lock temporarily to write image
-        cv2.imwrite(str(fpath), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
-        image_path = f"collected_frames/{fname}"
-        
-        with self._lock:
+            cv2.imwrite(str(fpath), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_path = f"collected_frames/{fname}"
             self._conn.execute(
                 "UPDATE collected_frames SET image_path = ? WHERE id = ?",
                 (image_path, frame_id),

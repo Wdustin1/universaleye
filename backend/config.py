@@ -61,6 +61,8 @@ class InspectionConfig:
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
+    # Comma-separated list via CORS_ORIGINS env var, e.g.
+    # CORS_ORIGINS="http://kiosk.local:3000,http://10.0.1.42:3000"
     cors_origins: list[str] = field(
         default_factory=lambda: [
             "http://localhost:3000",
@@ -110,7 +112,19 @@ def _resolve_data_dir() -> "Path | None":
     return None
 
 
-config = InspectionConfig(
-    video_file=os.environ.get("VIDEO_FILE"),
-    data_dir=_resolve_data_dir(),
-)
+def _resolve_cors_origins() -> "list[str] | None":
+    raw = os.environ.get("CORS_ORIGINS")
+    if not raw:
+        return None
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+_kwargs: dict = {
+    "video_file": os.environ.get("VIDEO_FILE"),
+    "data_dir": _resolve_data_dir(),
+}
+_cors = _resolve_cors_origins()
+if _cors is not None:
+    _kwargs["cors_origins"] = _cors
+
+config = InspectionConfig(**_kwargs)

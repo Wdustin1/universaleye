@@ -33,6 +33,21 @@ DEFECT_TYPES = [
 
 # ------ Alignment via ORB feature matching ------
 
+# ORB and BFMatcher are stateless after construction; cache them at module
+# scope so we don't pay the create cost on every inspection. Keyed by
+# orb_features so callers can still vary it via config.
+_ORB_CACHE: dict[int, cv2.ORB] = {}
+_BF_MATCHER = cv2.BFMatcher(cv2.NORM_HAMMING)
+
+
+def _get_orb(features: int) -> cv2.ORB:
+    orb = _ORB_CACHE.get(features)
+    if orb is None:
+        orb = cv2.ORB_create(nfeatures=features)
+        _ORB_CACHE[features] = orb
+    return orb
+
+
 def align_frame(
     frame_gray: np.ndarray,
     ref_gray: np.ndarray,
@@ -50,7 +65,7 @@ def align_frame(
     *confidence* is the RANSAC inlier ratio (0-1).
     If alignment fails, returns ``(frame_gray, None, 0.0)``.
     """
-    orb = cv2.ORB_create(nfeatures=orb_features)
+    orb = _get_orb(orb_features)
     kp1, des1 = orb.detectAndCompute(ref_gray, None)
     kp2, des2 = orb.detectAndCompute(frame_gray, None)
 
@@ -60,8 +75,7 @@ def align_frame(
                       len(des2) if des2 is not None else 0)
         return frame_gray, None, 0.0
 
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
-    raw_matches = bf.knnMatch(des1, des2, k=2)
+    raw_matches = _BF_MATCHER.knnMatch(des1, des2, k=2)
 
     # Lowe's ratio test
     good = []
@@ -257,7 +271,7 @@ def inspect_frame(
         return _SKIP
 
     # --- Grayscale SSIM for local detection (spatial defects) ---
-    gray_global, gray_map = ssim(gray_ref, gray_frame, full=True)
+    _, gray_map = ssim(gray_ref, gray_frame, full=True)
 
     # Mask out invalid border pixels from alignment warp
     gray_map[~valid_mask] = 1.0
@@ -273,12 +287,10 @@ def inspect_frame(
     )
 
     # --- Per-channel SSIM for global detection (colour-plane defects) ---
-    aligned_color = frame.copy()
-    for c in range(3):
-        aligned_color[:, :, c] = cv2.warpAffine(
-            frame[:, :, c], H, (w, h),
-            borderMode=cv2.BORDER_REPLICATE,
-        )
+    # warpAffine is multi-channel native; one call beats a Python loop.
+    aligned_color = cv2.warpAffine(
+        frame, H, (w, h), borderMode=cv2.BORDER_REPLICATE,
+    )
 
     # Crop to valid region for channel comparison
     ys, xs = np.where(valid_mask)

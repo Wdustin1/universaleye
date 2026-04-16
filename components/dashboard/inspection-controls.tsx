@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Play,
   Pause,
@@ -12,7 +12,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
+import { usePolling } from "@/hooks/use-polling"
 
 type InspectionState = "running" | "paused" | "stopped"
 
@@ -35,24 +36,37 @@ export function InspectionControls({
     setState(status)
   }, [status])
 
+  // Backend is the source of truth for collect-mode (so a page reload
+  // while collection is running shows the correct toggle).
+  const pollCollecting = useCallback(async () => {
+    try {
+      const res = await apiFetch(API.collectionStats)
+      if (res.ok) {
+        const data = await res.json()
+        setCollecting(Boolean(data.collecting))
+      }
+    } catch { /* backend not available */ }
+  }, [])
+  usePolling(pollCollecting, 5000, true)
+
   const handleStart = async () => {
     setState("running") // optimistic
     try {
-      await fetch(API.inspectionStart, { method: "POST" })
+      await apiFetch(API.inspectionStart, { method: "POST" })
     } catch { /* backend not available */ }
   }
 
   const handlePause = async () => {
     setState("paused") // optimistic
     try {
-      await fetch(API.inspectionPause, { method: "POST" })
+      await apiFetch(API.inspectionPause, { method: "POST" })
     } catch { /* backend not available */ }
   }
 
   const handleStop = async () => {
     setState("stopped") // optimistic
     try {
-      await fetch(API.inspectionStop, { method: "POST" })
+      await apiFetch(API.inspectionStop, { method: "POST" })
     } catch { /* backend not available */ }
   }
 
@@ -70,7 +84,7 @@ export function InspectionControls({
     if (sensitivityTimer.current) clearTimeout(sensitivityTimer.current)
     sensitivityTimer.current = setTimeout(async () => {
       try {
-        await fetch(API.sensitivity, {
+        await apiFetch(API.sensitivity, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sensitivity: value }),
@@ -81,13 +95,13 @@ export function InspectionControls({
 
   const handleNewReference = async () => {
     try {
-      await fetch(API.setReference, { method: "POST" })
+      await apiFetch(API.setReference, { method: "POST" })
     } catch { /* backend not available */ }
   }
 
   const handleResetReference = async () => {
     try {
-      await fetch(API.resetReference, { method: "POST" })
+      await apiFetch(API.resetReference, { method: "POST" })
     } catch { /* backend not available */ }
   }
 

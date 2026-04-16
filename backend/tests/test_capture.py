@@ -51,13 +51,50 @@ class TestCaptureManager:
         stats = cm.get_stats()
         assert stats["status"] == "paused"
 
-    def test_stop_resets_everything(self, test_config, test_db) -> None:
+    def test_stop_resets_run_stats(self, test_config, test_db) -> None:
         cm = CaptureManager(test_config, test_db)
         cm.start_inspection()
         cm.stop_inspection()
         stats = cm.get_stats()
         assert stats["status"] == "stopped"
         assert stats["labelsInspected"] == 0
+
+    def test_stop_preserves_defect_history(
+        self, test_config, test_db, blank_frame
+    ) -> None:
+        """Stop must NOT wipe the defect database. The previous behavior
+        silently destroyed an operator's shift record on a misclick."""
+        cm = CaptureManager(test_config, test_db)
+        # Seed a defect via the database directly (capture loop is not running)
+        diff = np.zeros(blank_frame.shape[:2], dtype=np.uint8)
+        diff[10:20, 10:20] = 200
+        test_db.insert_defect(
+            "2026-04-16T10:00:00", "Hickey", "major", "reject",
+            0.7, blank_frame, diff,
+        )
+        assert test_db.get_defect_count() == 1
+
+        cm.start_inspection()
+        cm.stop_inspection()
+
+        # Defect history must survive stop.
+        assert test_db.get_defect_count() == 1
+
+    def test_clear_defect_history_wipes_db(
+        self, test_config, test_db, blank_frame
+    ) -> None:
+        """The explicit clear path is the only way to drop history."""
+        cm = CaptureManager(test_config, test_db)
+        diff = np.zeros(blank_frame.shape[:2], dtype=np.uint8)
+        diff[10:20, 10:20] = 200
+        test_db.insert_defect(
+            "2026-04-16T10:00:00", "Hickey", "major", "reject",
+            0.7, blank_frame, diff,
+        )
+        assert test_db.get_defect_count() == 1
+
+        cm.clear_defect_history()
+        assert test_db.get_defect_count() == 0
 
     def test_set_sensitivity_clamps(self, test_config, test_db) -> None:
         cm = CaptureManager(test_config, test_db)

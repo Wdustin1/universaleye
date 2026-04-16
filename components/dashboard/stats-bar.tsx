@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Hash, AlertTriangle, Timer } from "lucide-react"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
 
 type Accent = "default" | "destructive" | "success" | "warning"
@@ -23,7 +23,7 @@ export function StatsBar() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(API.stats)
+      const res = await apiFetch(API.stats)
       if (res.ok) {
         const data = await res.json()
         setStats({

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
 
 interface BreakdownItem {
@@ -16,7 +16,7 @@ export function DefectBreakdown() {
 
   const fetchBreakdown = useCallback(async () => {
     try {
-      const res = await fetch(API.defectBreakdown)
+      const res = await apiFetch(API.defectBreakdown)
       if (res.ok) {
         setDefectData(await res.json())
         setLoading(false)

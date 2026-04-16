@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Filter, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { API } from "@/lib/api"
+import { API, apiFetch } from "@/lib/api"
+import { useSSE } from "@/hooks/use-polling"
 import { DefectDetail } from "./defect-detail"
 
 interface Defect {
@@ -61,7 +62,7 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
     if (!open) return
     const fetchDefects = async () => {
       try {
-        const res = await fetch(API.defects)
+        const res = await apiFetch(API.defects)
         if (res.ok) {
           const data = await res.json()
           setDefects(data)
@@ -73,20 +74,17 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
     return () => clearInterval(interval)
   }, [open])
 
-  // SSE for real-time defect notifications
-  useEffect(() => {
-    const source = new EventSource(API.events)
-    source.addEventListener("defect", (e) => {
-      try {
-        const newDefect = JSON.parse(e.data) as Defect
-        setDefects((prev) => {
-          if (prev.some((d) => d.id === newDefect.id)) return prev
-          return [newDefect, ...prev]
-        })
-      } catch { /* parse error */ }
-    })
-    return () => source.close()
+  // SSE for real-time defect notifications (auto-reconnects with backoff via useSSE)
+  const onDefectEvent = useCallback((data: string) => {
+    try {
+      const newDefect = JSON.parse(data) as Defect
+      setDefects((prev) => {
+        if (prev.some((d) => d.id === newDefect.id)) return prev
+        return [newDefect, ...prev]
+      })
+    } catch { /* parse error */ }
   }, [])
+  useSSE(API.events, { events: { defect: onDefectEvent } })
 
   // Escape key to close (only when detail modal is not open)
   useEffect(() => {
@@ -172,6 +170,7 @@ export function DefectLog({ open, onOpenChange }: { open: boolean; onOpenChange:
                   }`}
                 >
                   <div className="w-10 h-10 rounded overflow-hidden border border-border flex-shrink-0 bg-background">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={API.defectImage(defect.id)}
                       alt=""

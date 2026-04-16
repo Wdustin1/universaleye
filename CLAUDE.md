@@ -25,9 +25,12 @@ Package manager is **pnpm** (lock file committed).
 
 ```bash
 cd backend
-pip install -r requirements.txt          # Install dependencies
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload   # Start API server
-pytest                                   # Run test suite
+pip install -r requirements.txt                          # Install dependencies
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload     # Start API server
+pytest                                                   # Run full test suite
+pytest tests/test_inspector.py                           # Single file
+pytest tests/test_inspector.py::test_name -v             # Single test
+pytest -k "pattern"                                      # Match by name
 ```
 
 Both servers must run simultaneously for full functionality.
@@ -47,7 +50,7 @@ Both servers must run simultaneously for full functionality.
 - Fonts: Inter (sans) and JetBrains Mono (mono) via `next/font/google`
 
 ### Backend
-- **Python 3.9+**, **FastAPI**, **uvicorn**
+- **Python 3.12+** (per `backend/pyproject.toml`), **FastAPI**, **uvicorn**
 - **OpenCV** (`opencv-python-headless`) for video capture and motion detection
 - **scikit-image** for SSIM-based defect comparison
 - **NumPy** for image processing
@@ -95,7 +98,10 @@ backend/
 ├── inspector.py      # SSIM comparison, defect classification by type/severity
 ├── database.py       # SQLite defect persistence + annotated image storage
 ├── state_machine.py  # Motion detection state machine (MONITORING→MOTION→STABILIZING→INSPECT)
-└── tests/            # pytest suite (API, capture, config, database, inspector, models, state machine)
+└── tests/
+    ├── defect_simulator.py     # Synthetic defect injection harness
+    ├── test_flexo_defects.py   # Integration tests using the simulator against Inspector
+    └── test_*.py               # Unit tests (API, capture, config, database, inspector, models, state machine)
 ```
 
 ### API Endpoints
@@ -111,7 +117,8 @@ backend/
 | `/api/defect_breakdown` | GET | Defect type distribution with percentages |
 | `/api/inspection/start` | POST | Start/resume inspection |
 | `/api/inspection/pause` | POST | Pause inspection |
-| `/api/inspection/stop` | POST | Stop and reset all stats + clear defect database |
+| `/api/inspection/stop` | POST | Stop inspection, reset run-time stats. Defect history is **preserved**. |
+| `/api/defects/clear` | POST | Explicit destructive wipe of defect rows + annotated images |
 | `/api/inspection/sensitivity` | PUT | Set detection sensitivity (0–100) |
 | `/api/set_reference` | POST | Capture current frame as golden reference |
 | `/api/reset_reference` | POST | Clear reference image |
@@ -165,6 +172,14 @@ When no golden reference image is set:
 
 React hooks only (useState/useEffect). `page.tsx` owns top-level polling (stats, reference status) and passes props down. Component-local state for everything else. No external state library.
 
+- **`hooks/use-polling.ts`** — shared polling abstraction used across dashboard components; prefer it over ad-hoc `setInterval` when adding new polled endpoints.
+- **`components/error-boundary.tsx`** — top-level React error boundary wrapping the dashboard; catches render errors so the app doesn't white-screen on a component crash.
+
+### Routes
+
+- **`app/page.tsx`** — main inspection dashboard (client component).
+- **`app/collect/page.tsx`** — separate reference-collection / data-gathering route.
+
 ### Data
 
 Defect types: Smudge, Misregister, Hickey, Color Shift, Scratch, Splash/Spot, Missing Print, Web Crease. Severity levels: critical, major, minor. AI verdicts: reject, accept, review. Severity classification is based on SSIM score thresholds configured in `backend/config.py`.
@@ -177,8 +192,16 @@ Tailwind colors reference CSS variables via `hsl(var(--name))` pattern (see `tai
 
 ## Environment Variables
 
-- `NEXT_PUBLIC_API_URL` — frontend API base URL (default: `http://localhost:8000`)
-- Backend config is in `backend/config.py` (camera index, SSIM thresholds, CORS origins, etc.)
+**Frontend:**
+- `NEXT_PUBLIC_API_URL` — backend base URL (default `http://localhost:8000`).
+
+**Backend** (all read in `backend/config.py`):
+- `DATA_DIR` — absolute path for SQLite + image storage. Defaults to `backend/data/`. Useful when pointing at an external drive (e.g. `DATA_DIR=/Volumes/UniversalEye uvicorn main:app …`).
+- `VIDEO_FILE` — absolute path to a video file used in place of a live camera. Loops on EOF. Handy for offline development and reproducible test runs.
+- `CORS_ORIGINS` — comma-separated allowlist (e.g. `CORS_ORIGINS="http://kiosk.local:3000,http://10.0.1.42:3000"`). Defaults to `localhost:3000` + `127.0.0.1:3000`.
+
+**Backend defaults worth knowing:**
+- `camera_index = 1` (not 0). On a MacBook the internal webcam claims index 0, and a USB HDMI capture card lands at index 1. On other hardware you may need to override this in `backend/config.py`.
 
 ## Conventions
 
@@ -188,3 +211,7 @@ Tailwind colors reference CSS variables via `hsl(var(--name))` pattern (see `tai
 - Backend uses `threading.Lock` for shared state between capture thread and API routes
 - Backend CORS is hardcoded for `localhost:3000` — update `config.py` for production
 - Camera fallback: if no camera available, backend generates a placeholder frame (app still works)
+
+## Task Workflow
+
+The parent `~/Projects/CLAUDE.md` mandates a plan-first workflow: for non-trivial changes, write a checklist to `tasks/todo.md`, get it approved, then check items off as you work, and append a review section at the end. The `tasks/` directory at the repo root is where these live.
