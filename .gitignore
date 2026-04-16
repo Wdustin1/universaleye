@@ -20,3 +20,6 @@ backend/__pycache__/
 backend/.venv/
 backend/*.egg-info/
 backend/data/
+
+# Brainstorming companion (mockups, scratch state)
+.superpowers/
