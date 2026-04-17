@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Grid3X3,
   Camera,
+  CameraOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API, apiFetch } from "@/lib/api"
@@ -27,6 +28,7 @@ export function LiveFeedPanel({
   const [timestamp, setTimestamp] = useState("--:--:--")
   const [captureReady, setCaptureReady] = useState(false)
   const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null)
+  const [feedFailed, setFeedFailed] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastTapRef = useRef<number>(0)
 
@@ -140,10 +142,31 @@ export function LiveFeedPanel({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={API.videoFeed}
-          alt="Live camera feed"
+          alt=""
           className="absolute inset-0 w-full h-full object-contain"
-          style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: "center",
+            visibility: feedFailed ? "hidden" : "visible",
+          }}
+          onError={() => setFeedFailed(true)}
+          onLoad={() => setFeedFailed(false)}
         />
+        {feedFailed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background">
+            <div className="flex flex-col items-center gap-3 text-center px-6">
+              <div className="w-12 h-12 rounded-full bg-sunken border border-border-soft flex items-center justify-center">
+                <CameraOff className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Camera Offline</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Live video stream is unreachable. Check the capture backend.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Grid overlay */}
         {showGrid && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}>

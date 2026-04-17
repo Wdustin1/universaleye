@@ -39,9 +39,12 @@ export default function Page() {
           status: data.status ?? "stopped",
         })
         setHasReference(data.hasReference ?? false)
-        setInitialLoaded(true)
       }
     } catch { /* backend not available */ }
+    // Flip out of the skeleton state on the first attempt regardless of outcome,
+    // otherwise the TopStrip stays in its loading shimmer forever when the
+    // backend is unreachable (e.g. frontend-only demo on Vercel).
+    setInitialLoaded(true)
   }, [])
   usePolling(pollStats, 2000, true)
 
