@@ -11,8 +11,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { API, apiFetch } from "@/lib/api"
+import { ConfirmSheet } from "./confirm-sheet"
 
 type InspectionState = "running" | "paused" | "stopped"
+type ConfirmKind = null | "stop" | "reset-reference"
 
 export function InspectionControls({
   hasReference = true,
@@ -25,6 +27,7 @@ export function InspectionControls({
   // corrects it whenever the backend-polled `status` prop changes.
   const [state, setState] = useState<InspectionState>(status)
   const [sensitivity, setSensitivity] = useState(75)
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const sensitivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Keep local state in sync with backend truth (polled every 2 s from page.tsx)
@@ -46,11 +49,13 @@ export function InspectionControls({
     } catch { /* backend not available */ }
   }
 
-  const handleStop = async () => {
-    setState("stopped") // optimistic
+  const handleStop = () => setConfirmKind("stop")
+  const performStop = async () => {
+    setConfirmKind(null)
+    setState("stopped")
     try {
       await apiFetch(API.inspectionStop, { method: "POST" })
-    } catch { /* backend not available */ }
+    } catch { /* offline */ }
   }
 
   const handleSensitivity = (value: number) => {
@@ -74,10 +79,12 @@ export function InspectionControls({
     } catch { /* backend not available */ }
   }
 
-  const handleResetReference = async () => {
+  const handleResetReference = () => setConfirmKind("reset-reference")
+  const performResetReference = async () => {
+    setConfirmKind(null)
     try {
       await apiFetch(API.resetReference, { method: "POST" })
-    } catch { /* backend not available */ }
+    } catch { /* offline */ }
   }
 
   return (
@@ -234,6 +241,23 @@ export function InspectionControls({
           </div>
         </div>
       </div>
+
+      <ConfirmSheet
+        open={confirmKind === "stop"}
+        title="Stop inspection?"
+        body="Stops the inspection loop and resets run-time stats. Defect history is preserved. The current run cannot be resumed — Start will begin a new run."
+        confirmLabel="Stop"
+        onConfirm={performStop}
+        onCancel={() => setConfirmKind(null)}
+      />
+      <ConfirmSheet
+        open={confirmKind === "reset-reference"}
+        title="Reset golden reference?"
+        body="The golden reference image will be cleared. Inspection cannot resume until a new reference is captured."
+        confirmLabel="Reset"
+        onConfirm={performResetReference}
+        onCancel={() => setConfirmKind(null)}
+      />
     </div>
   )
 }
