@@ -87,3 +87,17 @@ describe('DefectAlertOverlay — expand', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('DefectAlertOverlay — stack', () => {
+  it('shows +N badge when multiple defects arrive during dwell', () => {
+    render(<DefectAlertOverlay />)
+    const es = (FakeEventSource as unknown as { latest: FakeEventSource }).latest
+    act(() => {
+      es.emit('defect', { id: 1, type: 'Hickey', severity: 'critical', timestamp: 't', ssimScore: 0.42, aiVerdict: 'reject' })
+    })
+    act(() => {
+      es.emit('defect', { id: 2, type: 'Smudge', severity: 'major', timestamp: 't', ssimScore: 0.62, aiVerdict: 'reject' })
+    })
+    expect(screen.getByText(/\+1/)).toBeInTheDocument()
+  })
+})

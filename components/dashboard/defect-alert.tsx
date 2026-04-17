@@ -40,14 +40,16 @@ const TIER: Record<string, { dwellMs: number; borderClass: string; stripeClass: 
 }
 
 export function DefectAlertOverlay() {
-  const [active, setActive] = useState<DefectEvent | null>(null)
+  const [stack, setStack] = useState<DefectEvent[]>([])  // newest first, max 3
+  const active = stack[0] ?? null
+  const overflowCount = Math.max(0, stack.length - 1)
   const [progress, setProgress] = useState(100) // 100 → 0
   const [expanded, setExpanded] = useState(false)
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const dismiss = useCallback(() => {
-    setActive(null)
+    setStack([])
     setProgress(100)
     setExpanded(false)
     if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null }
@@ -66,7 +68,7 @@ export function DefectAlertOverlay() {
       const data = JSON.parse(raw) as DefectEvent
       const tier = TIER[data.severity] ?? TIER.minor
       if (data.severity === "critical") playCriticalChime()
-      setActive(data)
+      setStack((prev) => [data, ...prev].slice(0, 3))
       setExpanded(false)
       setProgress(100)
       if (dismissTimer.current) clearTimeout(dismissTimer.current)
@@ -112,6 +114,11 @@ export function DefectAlertOverlay() {
             {active.timestamp.slice(11, 19)} · SSIM {active.ssimScore?.toFixed(3) ?? "—"} · #{active.id}
           </div>
         </div>
+        {overflowCount > 0 && (
+          <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-sunken text-muted-foreground border border-border-soft">
+            +{overflowCount}
+          </span>
+        )}
         {!expanded && (
           <button
             type="button"
