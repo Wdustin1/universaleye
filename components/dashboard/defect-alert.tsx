@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle } from "lucide-react"
 import { API } from "@/lib/api"
 import { useSSE } from "@/hooks/use-polling"
+import { playCriticalChime } from "@/lib/sound"
 
 interface DefectEvent {
   id: number
@@ -55,6 +56,7 @@ export function DefectAlertOverlay() {
     try {
       const data = JSON.parse(raw) as DefectEvent
       const tier = TIER[data.severity] ?? TIER.minor
+      if (data.severity === "critical") playCriticalChime()
       setActive(data)
       setProgress(100)
       if (dismissTimer.current) clearTimeout(dismissTimer.current)
