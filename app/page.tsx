@@ -14,6 +14,7 @@ import { SettingsSheet } from "@/components/dashboard/settings-sheet"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
+import { useBurnInGuard } from "@/lib/use-burn-in-guard"
 
 export default function Page() {
   const [defectLogOpen, setDefectLogOpen] = useState(false)
@@ -24,6 +25,7 @@ export default function Page() {
   const [selectedDefectId, setSelectedDefectId] = useState<number | null>(null)
   const [selectedDefect, setSelectedDefect] = useState<{ id: number; type: string; severity: "critical" | "major" | "minor"; timestamp: string; ssimScore: number | null; aiVerdict: "reject" | "accept" | "review" } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const burnInStyle = useBurnInGuard()
 
   const pollStats = useCallback(async () => {
     try {
@@ -64,7 +66,7 @@ export default function Page() {
   }
 
   return (
-    <div ref={containerRef} className="h-screen bg-canvas p-3.5 grid gap-2.5" style={{ gridTemplateRows: "38px 1fr 28px" }}>
+    <div ref={containerRef} className="h-screen bg-canvas p-3.5 grid gap-2.5" style={{ gridTemplateRows: "38px 1fr 28px", ...burnInStyle }}>
       <DefectAlertOverlay />
 
       <ErrorBoundary>
