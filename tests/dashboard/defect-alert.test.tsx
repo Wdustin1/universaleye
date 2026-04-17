@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { DefectAlertOverlay } from '@/components/dashboard/defect-alert'
 
@@ -59,6 +59,31 @@ describe('DefectAlertOverlay', () => {
     })
     expect(screen.getByRole('alert')).toBeInTheDocument()
     act(() => { vi.advanceTimersByTime(3500) })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('DefectAlertOverlay — expand', () => {
+  it('expands and cancels timer on tap', () => {
+    render(<DefectAlertOverlay />)
+    const es = (FakeEventSource as unknown as { latest: FakeEventSource }).latest
+    act(() => {
+      es.emit('defect', { id: 1, type: 'Hickey', severity: 'critical', timestamp: 't', ssimScore: 0.42, aiVerdict: 'reject' })
+    })
+    fireEvent.click(screen.getByRole('alert'))
+    expect(screen.getByRole('button', { name: /acknowledge/i })).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(6000) })
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('dismisses when Acknowledge is tapped', () => {
+    render(<DefectAlertOverlay />)
+    const es = (FakeEventSource as unknown as { latest: FakeEventSource }).latest
+    act(() => {
+      es.emit('defect', { id: 1, type: 'Hickey', severity: 'critical', timestamp: 't', ssimScore: 0.42, aiVerdict: 'reject' })
+    })
+    fireEvent.click(screen.getByRole('alert'))
+    fireEvent.click(screen.getByRole('button', { name: /acknowledge/i }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

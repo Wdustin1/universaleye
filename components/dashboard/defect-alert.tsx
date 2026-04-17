@@ -42,14 +42,23 @@ const TIER: Record<string, { dwellMs: number; borderClass: string; stripeClass: 
 export function DefectAlertOverlay() {
   const [active, setActive] = useState<DefectEvent | null>(null)
   const [progress, setProgress] = useState(100) // 100 → 0
+  const [expanded, setExpanded] = useState(false)
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const dismiss = useCallback(() => {
     setActive(null)
     setProgress(100)
+    setExpanded(false)
     if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null }
     if (tickTimer.current) { clearInterval(tickTimer.current); tickTimer.current = null }
+  }, [])
+
+  const expand = useCallback(() => {
+    setExpanded(true)
+    if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null }
+    if (tickTimer.current) { clearInterval(tickTimer.current); tickTimer.current = null }
+    setProgress(0)
   }, [])
 
   const onDefectEvent = useCallback((raw: string) => {
@@ -58,6 +67,7 @@ export function DefectAlertOverlay() {
       const tier = TIER[data.severity] ?? TIER.minor
       if (data.severity === "critical") playCriticalChime()
       setActive(data)
+      setExpanded(false)
       setProgress(100)
       if (dismissTimer.current) clearTimeout(dismissTimer.current)
       if (tickTimer.current) clearInterval(tickTimer.current)
@@ -88,26 +98,56 @@ export function DefectAlertOverlay() {
     <div
       role="alert"
       aria-live="assertive"
-      className={`fixed bottom-12 left-1/2 z-30 -translate-x-1/2 bg-card border ${tier.borderClass} ${tier.stripeClass} border-l-[3px] rounded-lg pl-3.5 pr-4 py-3 flex items-center gap-3.5 min-w-[320px] shadow-2xl overflow-hidden`}
+      onClick={expand}
+      className={`fixed bottom-12 left-1/2 z-30 -translate-x-1/2 bg-card border ${tier.borderClass} ${tier.stripeClass} border-l-[3px] rounded-lg pl-3.5 pr-4 py-3 ${expanded ? "flex flex-col gap-2 min-w-[420px]" : "flex items-center gap-3.5 min-w-[320px]"} shadow-2xl overflow-hidden`}
       style={{ animation: "alert-slide-up 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards" }}
     >
-      <div className={`w-10 h-10 rounded bg-gradient-to-br ${tier.thumbClass} border flex items-center justify-center flex-shrink-0`}>
-        <AlertTriangle className="w-4 h-4 opacity-80" />
-      </div>
-      <div className="flex-1 flex flex-col gap-0.5">
-        <div className="font-semibold text-sm capitalize">{active.type} · {active.severity}</div>
-        <div className="text-[10px] font-mono text-muted-foreground">
-          {active.timestamp.slice(11, 19)} · SSIM {active.ssimScore?.toFixed(3) ?? "—"} · #{active.id}
+      <div className="flex items-center gap-3.5 w-full">
+        <div className={`w-10 h-10 rounded bg-gradient-to-br ${tier.thumbClass} border flex items-center justify-center flex-shrink-0`}>
+          <AlertTriangle className="w-4 h-4 opacity-80" />
         </div>
+        <div className="flex-1 flex flex-col gap-0.5">
+          <div className="font-semibold text-sm capitalize">{active.type} · {active.severity}</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            {active.timestamp.slice(11, 19)} · SSIM {active.ssimScore?.toFixed(3) ?? "—"} · #{active.id}
+          </div>
+        </div>
+        {!expanded && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); dismiss() }}
+            className="text-[10px] text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss alert"
+          >
+            tap to dismiss
+          </button>
+        )}
       </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        className="text-[10px] text-muted-foreground hover:text-foreground"
-        aria-label="Dismiss alert"
-      >
-        tap to dismiss
-      </button>
+      {expanded && (
+        <div className="w-full flex gap-2 pt-3 mt-3 border-t border-border-soft">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); dismiss() }}
+            className="flex-1 h-10 rounded bg-primary text-primary-foreground text-xs font-semibold"
+          >
+            Acknowledge
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); dismiss() }}
+            className="flex-1 h-10 rounded bg-sunken text-foreground text-xs font-medium border border-border-soft"
+          >
+            Open in log
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); dismiss() }}
+            className="flex-1 h-10 rounded bg-sunken text-muted-foreground text-xs font-medium border border-border-soft"
+          >
+            False positive
+          </button>
+        </div>
+      )}
       <div className={`absolute bottom-0 left-0 h-[2px] ${tier.progressClass}`} style={{ width: `${progress}%` }} />
     </div>
   )
