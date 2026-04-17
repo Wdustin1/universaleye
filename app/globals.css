@@ -41,6 +41,12 @@
     --sidebar-accent-foreground: 210 20% 90%;
     --sidebar-border: 225 12% 13%;
     --sidebar-ring: 168 75% 42%;
+    --canvas: 225 20% 4%;
+    --sunken: 225 14% 11%;
+    --lifted: 225 14% 15%;
+    --border-soft: 225 12% 13%;
+    --border-strong: 225 12% 18%;
+    --accent-glow: 168 75% 42%;
   }
 }
 

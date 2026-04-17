@@ -73,6 +73,12 @@ const config: Config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        canvas: 'hsl(var(--canvas))',
+        sunken: 'hsl(var(--sunken))',
+        lifted: 'hsl(var(--lifted))',
+        'border-soft': 'hsl(var(--border-soft))',
+        'border-strong': 'hsl(var(--border-strong))',
+        'accent-glow': 'hsl(var(--accent-glow))',
       },
       borderRadius: {
         lg: 'var(--radius)',
