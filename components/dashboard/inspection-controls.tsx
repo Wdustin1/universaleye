@@ -225,7 +225,7 @@ export function InspectionControls({
               onClick={handleNewReference}
             >
               <Camera className="w-3 h-3 flex-shrink-0" />
-              New Reference
+              New
             </Button>
             <Button
               variant="ghost"
@@ -234,7 +234,7 @@ export function InspectionControls({
               onClick={handleResetReference}
             >
               <RotateCcw className="w-3 h-3 flex-shrink-0" />
-              Reset to Original
+              Reset
             </Button>
           </div>
         </div>
