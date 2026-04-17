@@ -125,34 +125,32 @@ export function InspectionControls({
               <p className="text-[9px] text-warning text-center">Set a reference image first</p>
             )}
 
-            {/* Pause / Stop row */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePause}
-                className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-medium transition-all ${
-                  state === "paused"
-                    ? "bg-warning/15 text-warning border border-warning/30"
-                    : "bg-secondary text-secondary-foreground hover:bg-accent"
-                }`}
-              >
-                <Pause className="w-4 h-4" />
-                Pause
-              </button>
+            {/* Pause / Stop — stacked so both fit in the narrow column */}
+            <button
+              type="button"
+              onClick={handlePause}
+              className={`flex items-center justify-center gap-2 w-full h-11 rounded-lg text-sm font-medium transition-all ${
+                state === "paused"
+                  ? "bg-warning/15 text-warning border border-warning/30"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent"
+              }`}
+            >
+              <Pause className="w-4 h-4" />
+              Pause
+            </button>
 
-              <button
-                type="button"
-                onClick={handleStop}
-                className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-medium transition-all ${
-                  state === "stopped"
-                    ? "bg-destructive/15 text-destructive border border-destructive/30"
-                    : "bg-secondary text-secondary-foreground hover:bg-accent"
-                }`}
-              >
-                <Square className="w-4 h-4" />
-                Stop
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleStop}
+              className={`flex items-center justify-center gap-2 w-full h-11 rounded-lg text-sm font-medium transition-all ${
+                state === "stopped"
+                  ? "bg-destructive/15 text-destructive border border-destructive/30"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent"
+              }`}
+            >
+              <Square className="w-4 h-4" />
+              Stop
+            </button>
           </div>
 
           {/* State indicator */}
