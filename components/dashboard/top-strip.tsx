@@ -2,6 +2,7 @@
 
 import { Menu, Maximize2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 
 type Status = "running" | "paused" | "stopped"
 
@@ -52,7 +53,7 @@ export function TopStrip({
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Defects</span>
         {loading
           ? <Skeleton className="h-3 w-6 inline-block" />
-          : <span className="font-mono text-sm font-semibold tabular-nums text-destructive">{stats.defectsFound}</span>
+          : <span className="font-mono text-sm font-semibold tabular-nums text-destructive"><AnimatedNumber value={stats.defectsFound} /></span>
         }
       </button>
       <Stat
@@ -61,7 +62,7 @@ export function TopStrip({
         valueClass={rate > 0.5 ? "text-warning" : undefined}
         loading={loading}
       />
-      <Stat label="Run" value={stats.runTime} loading={loading} />
+      <Stat label="Run" value={stats.runTime} loading={loading} animate={false} />
       <div className="ml-auto flex items-center gap-2.5">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono border ${chip.className}`}>
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -74,13 +75,15 @@ export function TopStrip({
   )
 }
 
-function Stat({ label, value, valueClass, loading }: { label: string; value: string; valueClass?: string; loading?: boolean }) {
+function Stat({ label, value, valueClass, loading, animate = true }: { label: string; value: string; valueClass?: string; loading?: boolean; animate?: boolean }) {
   return (
     <div className="flex items-baseline gap-1.5">
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
       {loading
         ? <Skeleton className="h-3 w-12" />
-        : <span className={`font-mono text-sm font-semibold tabular-nums ${valueClass ?? "text-foreground"}`}>{value}</span>
+        : <span className={`font-mono text-sm font-semibold tabular-nums ${valueClass ?? "text-foreground"}`}>
+            {animate ? <AnimatedNumber value={value} /> : value}
+          </span>
       }
     </div>
   )
