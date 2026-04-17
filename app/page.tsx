@@ -10,12 +10,14 @@ import { DefectDetail } from "@/components/dashboard/defect-detail"
 import { DefectLog } from "@/components/dashboard/defect-log"
 import { InspectionControls } from "@/components/dashboard/inspection-controls"
 import { DefectAlertOverlay } from "@/components/dashboard/defect-alert"
+import { SettingsSheet } from "@/components/dashboard/settings-sheet"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
 
 export default function Page() {
   const [defectLogOpen, setDefectLogOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [stats, setStats] = useState({ labelsInspected: 0, defectsFound: 0, runTime: "00:00:00", status: "stopped" as "running" | "paused" | "stopped" })
   const [hasReference, setHasReference] = useState(false)
   const [selectedDefectId, setSelectedDefectId] = useState<number | null>(null)
@@ -66,7 +68,7 @@ export default function Page() {
       <ErrorBoundary>
         <TopStrip
           stats={stats}
-          onOpenSettings={() => { /* wired in Task 13 */ }}
+          onOpenSettings={() => setSettingsOpen(true)}
           onOpenLog={() => setDefectLogOpen(true)}
           onToggleFullscreen={toggleFullscreen}
         />
@@ -95,6 +97,10 @@ export default function Page() {
 
       <ErrorBoundary>
         <DefectLog open={defectLogOpen} onOpenChange={setDefectLogOpen} />
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} onOpenLog={() => setDefectLogOpen(true)} />
       </ErrorBoundary>
 
       {selectedDefect && (
