@@ -45,6 +45,7 @@ export const API = {
   currentCapture: `${API_BASE}/api/current_capture`,
   stats: `${API_BASE}/api/stats`,
   defects: `${API_BASE}/api/defects`,
+  defectsClear: `${API_BASE}/api/defects/clear`,
   defectImage: (id: number) => `${API_BASE}/api/defects/${id}/image`,
   defectBreakdown: `${API_BASE}/api/defect_breakdown`,
   inspectionStart: `${API_BASE}/api/inspection/start`,

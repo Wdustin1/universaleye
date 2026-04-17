@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { X, Database, Bell, BellOff, History, ExternalLink } from "lucide-react"
+import { X, Database, Bell, BellOff, History, ExternalLink, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { API, apiFetch } from "@/lib/api"
 import { usePolling } from "@/hooks/use-polling"
+import { ConfirmSheet } from "./confirm-sheet"
 
 const SOUND_KEY = "ueye:sound-enabled"
 
@@ -18,6 +19,7 @@ export function SettingsSheet({
   onOpenLog: () => void
 }) {
   const [collecting, setCollecting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem(SOUND_KEY) === "1" : false
   )
@@ -103,10 +105,24 @@ export function SettingsSheet({
               <RowButton onClick={() => { onOpenLog(); onOpenChange(false) }} icon={<History className="w-4 h-4" />} aria-label="Open defect history">
                 <span>Defect History</span>
               </RowButton>
+              <RowButton onClick={() => setConfirming(true)} icon={<Trash2 className="w-4 h-4" />}>
+                <span className="text-destructive">Clear All Defects</span>
+              </RowButton>
             </Section>
           </div>
         </div>
       </div>
+      <ConfirmSheet
+        open={confirming}
+        title="Clear defect history?"
+        body="Deletes all defect rows and annotated images from disk. The current run continues. This cannot be undone."
+        confirmLabel="Clear"
+        onConfirm={async () => {
+          setConfirming(false)
+          try { await apiFetch(API.defectsClear, { method: "POST" }) } catch { /* offline */ }
+        }}
+        onCancel={() => setConfirming(false)}
+      />
     </>
   )
 }
