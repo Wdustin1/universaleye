@@ -1,6 +1,7 @@
 "use client"
 
 import { Menu, Maximize2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 
 type Status = "running" | "paused" | "stopped"
 
@@ -22,11 +23,13 @@ export function TopStrip({
   onOpenSettings,
   onOpenLog,
   onToggleFullscreen,
+  loading,
 }: {
   stats: Stats
   onOpenSettings: () => void
   onOpenLog: () => void
   onToggleFullscreen: () => void
+  loading?: boolean
 }) {
   const rate = stats.labelsInspected > 0
     ? (stats.defectsFound / stats.labelsInspected) * 100
@@ -39,7 +42,7 @@ export function TopStrip({
       role="status"
       aria-live="polite"
     >
-      <Stat label="Inspected" value={stats.labelsInspected.toLocaleString()} />
+      <Stat label="Inspected" value={stats.labelsInspected.toLocaleString()} loading={loading} />
       <button
         type="button"
         onClick={onOpenLog}
@@ -47,14 +50,18 @@ export function TopStrip({
         aria-label={`Defects: ${stats.defectsFound}. Tap to open defect history.`}
       >
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Defects</span>
-        <span className="font-mono text-sm font-semibold tabular-nums text-destructive">{stats.defectsFound}</span>
+        {loading
+          ? <Skeleton className="h-3 w-6 inline-block" />
+          : <span className="font-mono text-sm font-semibold tabular-nums text-destructive">{stats.defectsFound}</span>
+        }
       </button>
       <Stat
         label="Rate"
         value={`${rate.toFixed(2)}%`}
         valueClass={rate > 0.5 ? "text-warning" : undefined}
+        loading={loading}
       />
-      <Stat label="Run" value={stats.runTime} />
+      <Stat label="Run" value={stats.runTime} loading={loading} />
       <div className="ml-auto flex items-center gap-2.5">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium font-mono border ${chip.className}`}>
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -67,11 +74,14 @@ export function TopStrip({
   )
 }
 
-function Stat({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function Stat({ label, value, valueClass, loading }: { label: string; value: string; valueClass?: string; loading?: boolean }) {
   return (
     <div className="flex items-baseline gap-1.5">
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className={`font-mono text-sm font-semibold tabular-nums ${valueClass ?? "text-foreground"}`}>{value}</span>
+      {loading
+        ? <Skeleton className="h-3 w-12" />
+        : <span className={`font-mono text-sm font-semibold tabular-nums ${valueClass ?? "text-foreground"}`}>{value}</span>
+      }
     </div>
   )
 }

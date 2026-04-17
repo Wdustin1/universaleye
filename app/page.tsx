@@ -20,6 +20,7 @@ export default function Page() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [stats, setStats] = useState({ labelsInspected: 0, defectsFound: 0, runTime: "00:00:00", status: "stopped" as "running" | "paused" | "stopped" })
   const [hasReference, setHasReference] = useState(false)
+  const [initialLoaded, setInitialLoaded] = useState(false)
   const [selectedDefectId, setSelectedDefectId] = useState<number | null>(null)
   const [selectedDefect, setSelectedDefect] = useState<{ id: number; type: string; severity: "critical" | "major" | "minor"; timestamp: string; ssimScore: number | null; aiVerdict: "reject" | "accept" | "review" } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -36,6 +37,7 @@ export default function Page() {
           status: data.status ?? "stopped",
         })
         setHasReference(data.hasReference ?? false)
+        setInitialLoaded(true)
       }
     } catch { /* backend not available */ }
   }, [])
@@ -71,6 +73,7 @@ export default function Page() {
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenLog={() => setDefectLogOpen(true)}
           onToggleFullscreen={toggleFullscreen}
+          loading={!initialLoaded}
         />
       </ErrorBoundary>
 
