@@ -28,6 +28,7 @@ export function LiveFeedPanel({
   const [captureReady, setCaptureReady] = useState(false)
   const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lastTapRef = useRef<number>(0)
 
   // Update timestamp from local clock — no extra API poll needed.
   // defectCount is now passed in from page.tsx which already polls /stats.
@@ -122,7 +123,19 @@ export function LiveFeedPanel({
           </Button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 relative overflow-hidden bg-background">
+      <div
+        ref={containerRef}
+        className="flex-1 relative overflow-hidden bg-background"
+        onClick={() => {
+          const now = performance.now()
+          if (now - lastTapRef.current < 300) {
+            toggleFullscreen()
+            lastTapRef.current = 0
+          } else {
+            lastTapRef.current = now
+          }
+        }}
+      >
         {/* MJPEG stream from Python backend */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

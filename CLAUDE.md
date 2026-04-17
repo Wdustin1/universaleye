@@ -17,6 +17,8 @@ pnpm dev          # Start dev server (port 3000)
 pnpm build        # Production build
 pnpm start        # Run production server
 pnpm lint         # ESLint (flat config, eslint.config.mjs)
+pnpm test         # Run Vitest (jsdom)
+pnpm test:watch   # Vitest watch mode
 ```
 
 Package manager is **pnpm** (lock file committed).
@@ -66,12 +68,14 @@ All frontend components poll the Python backend at `localhost:8000` (configurabl
 | Component | Backend Endpoint | Method |
 |-----------|-----------------|--------|
 | LiveFeedPanel | `GET /video_feed` | MJPEG `<img>` stream |
-| ReferenceComparison | `GET /api/reference_image` + `GET /api/current_capture` | Polling `<img>` tags |
-| StatsBar | `GET /api/stats` | Polls every 2s |
+| GoldenReference | `GET /api/reference_image` | Polling `<img>` every 5s |
+| LastDefect | `GET /api/defects?limit=1` + `/api/defects/{id}/image` | Polling every 2s |
+| TopStrip | (props from `page.tsx`) | `page.tsx` polls `/api/stats` every 2s |
+| HealthStrip | `GET /api/health` | Polls every 5s |
 | DefectLog | `GET /api/defects` + `GET /api/events` | Polls + SSE |
-| DefectBreakdown | `GET /api/defect_breakdown` | Polls every 5s |
-| InspectionControls | `POST start/pause/stop`, `PUT sensitivity`, `POST set/reset_reference` | Button clicks |
-| DashboardHeader | Props from `page.tsx` | `page.tsx` polls `/api/stats` |
+| SettingsSheet | `GET /api/collection/stats`, `POST /api/collection/start\|stop`, `POST /api/defects/clear` | Polls (when open) + POSTs |
+| InspectionControls | `POST /api/inspection/start\|pause\|stop`, `PUT /api/inspection/sensitivity`, `POST /api/set_reference`, `POST /api/reset_reference` | Button clicks + debounced slider |
+| DefectAlertOverlay | `GET /api/events` (SSE) | Real-time push |
 
 ### Backend Architecture
 
@@ -103,6 +107,17 @@ backend/
     ├── test_flexo_defects.py   # Integration tests using the simulator against Inspector
     └── test_*.py               # Unit tests (API, capture, config, database, inspector, models, state machine)
 ```
+
+### Frontend Tests
+
+Vitest + React Testing Library, running under jsdom. Test files live in `tests/` at the repo root (separate from `backend/tests/`).
+
+```bash
+pnpm test          # Run once
+pnpm test:watch    # Watch mode
+```
+
+41 tests across 11 files cover TopStrip, HealthStrip, GoldenReference, LastDefect, SettingsSheet, ConfirmSheet, DefectAlert (4 scenarios + expand + stack), useHoldToConfirm, Sound (Web Audio mock), AnimatedNumber, plus a smoke test.
 
 ### API Endpoints
 
@@ -147,18 +162,20 @@ MONITORING → (motion detected) → MOTION → (motion stops) → STABILIZING �
 Single-page dashboard in `app/page.tsx` (client component). Fixed viewport (`h-screen`, `overflow-hidden`):
 
 ```
-+-------------------------------------------------+
-| DashboardHeader (job info, status, defect count) |
-+-------------------------------------------------+
-| StatsBar (labels inspected, defects, run time)   |
-+--------+--------------------+--------------------+
-|Controls| LiveFeedPanel      | ReferenceComparison|
-|(w-44)  | (flex-[5])         | (flex-[2])         |
-|        +--------------------+                    |
-|        | DefectBreakdown (h-36)                  |
-+--------+--------------------+--------------------+
-          DefectLog -> slide-out panel from right edge
-          DefectDetail -> modal overlay on defect click
++--------------------------------------------------------------+
+| TOP STRIP — Inspected · Defects · Rate · Run · Status · ≡ ⛶  |
++------+-----------------------------------+-------------------+
+|CTRLS | LIVE FEED                         | GOLDEN REFERENCE  |
+|      |                                   +-------------------+
+|      | (defect alert slides up here)     | LAST DEFECT       |
++------+-----------------------------------+-------------------+
+| BOTTOM STRIP — Camera · FPS · Alignment · State · Pipeline · |
+|                Defect mix                                    |
++--------------------------------------------------------------+
+  Defect Log  →  slide-out panel (right edge, triggered by Defects count tap)
+  Settings Sheet  →  slide-out panel (right edge, triggered by ≡ icon)
+  Defect Detail  →  modal overlay on defect click
+  Confirm Sheet  →  modal with hold-to-confirm for destructive actions
 ```
 
 ### Onboarding Flow

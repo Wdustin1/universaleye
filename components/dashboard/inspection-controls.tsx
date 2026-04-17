@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Play,
   Pause,
@@ -8,14 +8,13 @@ import {
   SlidersHorizontal,
   Camera,
   RotateCcw,
-  Database,
 } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { API, apiFetch } from "@/lib/api"
-import { usePolling } from "@/hooks/use-polling"
+import { ConfirmSheet } from "./confirm-sheet"
 
 type InspectionState = "running" | "paused" | "stopped"
+type ConfirmKind = null | "stop" | "reset-reference"
 
 export function InspectionControls({
   hasReference = true,
@@ -28,26 +27,13 @@ export function InspectionControls({
   // corrects it whenever the backend-polled `status` prop changes.
   const [state, setState] = useState<InspectionState>(status)
   const [sensitivity, setSensitivity] = useState(75)
-  const [collecting, setCollecting] = useState(false)
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const sensitivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Keep local state in sync with backend truth (polled every 2 s from page.tsx)
   useEffect(() => {
     setState(status)
   }, [status])
-
-  // Backend is the source of truth for collect-mode (so a page reload
-  // while collection is running shows the correct toggle).
-  const pollCollecting = useCallback(async () => {
-    try {
-      const res = await apiFetch(API.collectionStats)
-      if (res.ok) {
-        const data = await res.json()
-        setCollecting(Boolean(data.collecting))
-      }
-    } catch { /* backend not available */ }
-  }, [])
-  usePolling(pollCollecting, 5000, true)
 
   const handleStart = async () => {
     setState("running") // optimistic
@@ -63,19 +49,13 @@ export function InspectionControls({
     } catch { /* backend not available */ }
   }
 
-  const handleStop = async () => {
-    setState("stopped") // optimistic
+  const handleStop = () => setConfirmKind("stop")
+  const performStop = async () => {
+    setConfirmKind(null)
+    setState("stopped")
     try {
       await apiFetch(API.inspectionStop, { method: "POST" })
-    } catch { /* backend not available */ }
-  }
-
-  const handleCollectToggle = async () => {
-    const next = !collecting
-    setCollecting(next)
-    try {
-      await fetch(next ? API.collectionStart : API.collectionStop, { method: "POST" })
-    } catch { /* backend not available */ }
+    } catch { /* offline */ }
   }
 
   const handleSensitivity = (value: number) => {
@@ -99,10 +79,12 @@ export function InspectionControls({
     } catch { /* backend not available */ }
   }
 
-  const handleResetReference = async () => {
+  const handleResetReference = () => setConfirmKind("reset-reference")
+  const performResetReference = async () => {
+    setConfirmKind(null)
     try {
       await apiFetch(API.resetReference, { method: "POST" })
-    } catch { /* backend not available */ }
+    } catch { /* offline */ }
   }
 
   return (
@@ -125,7 +107,7 @@ export function InspectionControls({
               type="button"
               onClick={handleStart}
               disabled={!hasReference && state !== "running"}
-              className={`relative flex items-center justify-center gap-2.5 w-full h-11 rounded-lg text-sm font-medium transition-all ${
+              className={`relative flex items-center justify-center gap-2.5 w-full h-14 rounded-lg text-base font-semibold transition-all ${
                 !hasReference && state !== "running"
                   ? "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
                   : state === "running"
@@ -136,7 +118,7 @@ export function InspectionControls({
               {state === "running" && (
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
               )}
-              <Play className="w-4 h-4" />
+              <Play className="w-5 h-5" />
               {state === "paused" ? "Resume" : "Start"}
             </button>
             {!hasReference && state !== "running" && (
@@ -148,26 +130,26 @@ export function InspectionControls({
               <button
                 type="button"
                 onClick={handlePause}
-                className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-medium transition-all ${
                   state === "paused"
                     ? "bg-warning/15 text-warning border border-warning/30"
                     : "bg-secondary text-secondary-foreground hover:bg-accent"
                 }`}
               >
-                <Pause className="w-3.5 h-3.5" />
+                <Pause className="w-4 h-4" />
                 Pause
               </button>
 
               <button
                 type="button"
                 onClick={handleStop}
-                className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-medium transition-all ${
                   state === "stopped"
                     ? "bg-destructive/15 text-destructive border border-destructive/30"
                     : "bg-secondary text-secondary-foreground hover:bg-accent"
                 }`}
               >
-                <Square className="w-3.5 h-3.5" />
+                <Square className="w-4 h-4" />
                 Stop
               </button>
             </div>
@@ -205,22 +187,24 @@ export function InspectionControls({
             </p>
             <span className="text-[10px] font-mono text-foreground">{sensitivity}%</span>
           </div>
-          <div className="relative h-1.5 bg-secondary rounded-full group">
-            <div
-              className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-              style={{ width: `${sensitivity}%` }}
-            />
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-primary-foreground shadow-sm transition-all"
-              style={{ left: `calc(${sensitivity}% - 6px)` }}
-            />
+          <div className="relative h-11 flex items-center group">
+            <div className="absolute inset-x-0 h-1.5 bg-secondary rounded-full top-1/2 -translate-y-1/2">
+              <div
+                className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
+                style={{ width: `${sensitivity}%` }}
+              />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-primary border-2 border-primary-foreground shadow-sm transition-all"
+                style={{ left: `calc(${sensitivity}% - 7px)` }}
+              />
+            </div>
             <input
               type="range"
               min="0"
               max="100"
               value={sensitivity}
               onChange={(e) => handleSensitivity(Number(e.target.value))}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               aria-label="Detection sensitivity"
             />
           </div>
@@ -256,38 +240,24 @@ export function InspectionControls({
             </Button>
           </div>
         </div>
-
-        {/* Data Collection */}
-        <div className="pt-4 border-t border-border -mx-3 px-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-            Training Data
-          </p>
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={handleCollectToggle}
-              className={`flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-medium transition-all w-full ${
-                collecting
-                  ? "bg-primary/15 text-primary border border-primary/30"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-            >
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${collecting ? "bg-primary animate-pulse" : "bg-muted-foreground"}`} />
-              {collecting ? "Collecting…" : "Collect Frames"}
-            </button>
-            <Link href="/collect" target="_blank">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start h-7 text-[11px] text-muted-foreground gap-1.5 px-2 w-full"
-              >
-                <Database className="w-3 h-3 flex-shrink-0" />
-                Label Frames
-              </Button>
-            </Link>
-          </div>
-        </div>
       </div>
+
+      <ConfirmSheet
+        open={confirmKind === "stop"}
+        title="Stop inspection?"
+        body="Stops the inspection loop and resets run-time stats. Defect history is preserved. The current run cannot be resumed — Start will begin a new run."
+        confirmLabel="Stop"
+        onConfirm={performStop}
+        onCancel={() => setConfirmKind(null)}
+      />
+      <ConfirmSheet
+        open={confirmKind === "reset-reference"}
+        title="Reset golden reference?"
+        body="The golden reference image will be cleared. Inspection cannot resume until a new reference is captured."
+        confirmLabel="Reset"
+        onConfirm={performResetReference}
+        onCancel={() => setConfirmKind(null)}
+      />
     </div>
   )
 }
